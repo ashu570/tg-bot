@@ -27,13 +27,17 @@ async def bridge_to_link_bot(shadow_messages: list, reply_chat_id: int, batch_si
     await bot.send_message(reply_chat_id, "🔗 **Stage 4: Bridging...**\nExecuting batch command with link generator...")
     
     try:
-        # Open conversation with a strict 15-second timeout as requested
         async with userbot.conversation(LINK_BOT_USERNAME, timeout=30) as conv:
-            await conv.send_message("/batch")
-            await asyncio.sleep(0.5) 
-            await userbot.forward_messages(LINK_BOT_USERNAME, shadow_messages[0])
-            await asyncio.sleep(0.5)
-            await userbot.forward_messages(LINK_BOT_USERNAME, shadow_messages[-1])
+            if batch_size == 1:
+                await conv.send_message("/genlink")
+                await asyncio.sleep(0.5) 
+                await userbot.forward_messages(LINK_BOT_USERNAME, shadow_messages[0])
+            else:   
+                await conv.send_message("/batch")
+                await asyncio.sleep(0.5) 
+                await userbot.forward_messages(LINK_BOT_USERNAME, shadow_messages[0])
+                await asyncio.sleep(0.5)
+                await userbot.forward_messages(LINK_BOT_USERNAME, shadow_messages[-1])
             batch_link = None
             timeout_counter = 0
             
@@ -42,7 +46,6 @@ async def bridge_to_link_bot(shadow_messages: list, reply_chat_id: int, batch_si
                 if history:
                     latest_msg = history[0]
                     reply_text = latest_msg.raw_text or "" 
-                    print(reply_text)
                     link_match = re.search(r'(https://t\.me/\S+\?start=\S+)', reply_text)
                     if link_match:
                         batch_link = link_match.group(1)

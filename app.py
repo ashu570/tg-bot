@@ -2,6 +2,7 @@ import asyncio
 from config import config
 from src.libs.logger import logger
 from src.libs.user_client import bot, userbot
+import src.handlers.commands
 
 async def main():
     logger.info("Booting up Orchestrator Bot and Userbot...")

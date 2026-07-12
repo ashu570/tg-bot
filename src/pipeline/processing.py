@@ -3,6 +3,7 @@ import asyncio
 from src.libs.logger import logger
 from src.libs.user_client import bot
 from src.pipeline.publish import publish_and_cleanup
+from src.helper.commons import ACTIVE_BATCHES
 
 DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
@@ -76,3 +77,15 @@ async def process_files(messages: list, reply_chat_id: int):
     
     # Future hand-off to publishing.py goes here
     return processed_assets
+
+async def handle_series_selection(chat_id: int, target_hash: str):
+    session_data = ACTIVE_BATCHES.get(chat_id)
+    if not session_data:
+        await bot.send_message(chat_id, "⚠️ Session expired.")
+        return
+    messages_to_process = session_data.get(target_hash)
+
+    if not messages_to_process:
+        await bot.send_message(chat_id, "⚠️ No files found for this hash.")
+        return
+    await process_files(messages_to_process, chat_id)
