@@ -5,19 +5,9 @@ from src.libs.logger import logger
 from src.libs.user_client import bot, userbot
 from config import config
 from telethon import Button
+from src.helper.file_formator import format_video_metadata
 
 LINK_BOT_USERNAME = "@Links_X_Bot"
-
-def format_shadow_caption(original_message, new_filename):
-    original_text = original_message.text or ""
-    if original_text.startswith("v-"):
-        original_text = original_text[2:].strip()
-    description = original_text if original_text else "No additional description provided."
-    return (
-        f"🎬 **{new_filename}**\n\n"
-        f"📝 **Description:**\n{description}\n\n"
-        f"🛡 *Securely archived by Orchestrator*"
-    )
 
 async def bridge_to_link_bot(shadow_messages: list, reply_chat_id: int, batch_size: int):
     """
@@ -99,7 +89,7 @@ async def publish_and_cleanup(processed_assets: list, reply_chat_id: int):
             logger.info(f"Uploading file {index}/{len(processed_assets)} to Shadow Channel...")
             
             # Generate the rich caption utilizing the original RAW message data
-            rich_caption = format_shadow_caption(asset['original_message'], filename)
+            rich_caption = asset['caption']
             
             # Upload the video + thumbnail + rich caption to the Shadow channel
             shadow_msg = await userbot.send_file(

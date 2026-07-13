@@ -4,22 +4,22 @@ from src.libs.logger import logger
 from src.libs.user_client import bot
 from src.pipeline.publish import publish_and_cleanup
 from src.helper.commons import ACTIVE_BATCHES
+from src.helper.file_formator import format_video_metadata
 
 DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 async def extract_thumbnail(video_path: str, thumb_path: str):
-    """Runs FFmpeg in a subprocess to extract a frame at 00:00:05."""
     command = [
         "ffmpeg",
-        "-ss", "00:00:05",         
-        "-i", video_path,          
-        "-vframes", "1",           
-        "-q:v", "2",               
-        thumb_path,                
-        "-y"                   
+        "-ss", "00:00:05",
+        "-i", video_path,
+        "-vframes", "1",
+        "-q:v", "2",
+        "-vf", "scale=w=320:h=320:force_original_aspect_ratio=decrease",
+        thumb_path,
+        "-y"
     ]
-    
     # Run the FFmpeg command asynchronously so we don't block the bot
     process = await asyncio.create_subprocess_exec(
         *command,
@@ -27,8 +27,6 @@ async def extract_thumbnail(video_path: str, thumb_path: str):
         stderr=asyncio.subprocess.DEVNULL
     )
     await process.communicate()
-    
-    # Verify the thumbnail was actually created
     if process.returncode == 0 and os.path.exists(thumb_path):
         return thumb_path
     return None
@@ -44,14 +42,14 @@ async def process_files(messages: list, reply_chat_id: int):
             if not original_file_path:
                 logger.warning(f"Failed to download media for message {msg.id}")
                 continue
-            ext = os.path.splitext(original_file_path)[1]
-            new_filename = f"video_{msg.id}{ext}"
+            file_name = os.path.basename(original_file_path)
+            new_filename, final_caption = format_video_metadata(file_name) #e.g: movie.name.xxx.mp4
             new_file_path = os.path.join(DOWNLOAD_DIR, new_filename)
-            
             os.rename(original_file_path, new_file_path)
             
             # 3. Thumbnail Extraction
-            thumb_filename = f"thumb_{msg.id}.jpg"
+            file,_ = os.path.splitext(new_filename)
+            thumb_filename = f"{file}.jpg"
             thumb_file_path = os.path.join(DOWNLOAD_DIR, thumb_filename)
             
             logger.info(f"Extracting thumbnail for {new_filename}...")
@@ -61,7 +59,8 @@ async def process_files(messages: list, reply_chat_id: int):
             processed_assets.append({
                 "video": new_file_path,
                 "thumbnail": extracted_thumb,
-                "original_message": msg
+                "original_message": msg,
+                "caption": final_caption
             })
             
         except Exception as e:
