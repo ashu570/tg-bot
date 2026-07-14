@@ -3,6 +3,7 @@ from collections import defaultdict
 from telethon.tl.custom import Message
 from src.helper.commons import common_helper
 
+#Todo: Optimize
 def extract_metadata(text: str) -> tuple:
     season, episode, quality, language = "Unknown", "Unknown", "Unknown", "Unknown"
     s_match = re.search(r'[Ss](\d+)', text)

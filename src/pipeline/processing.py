@@ -1,10 +1,13 @@
 import os
+import re
 import asyncio
 from src.libs.logger import logger
 from src.libs.user_client import bot
 from src.pipeline.publish import publish_and_cleanup
 from src.helper.commons import ACTIVE_BATCHES
 from src.helper.file_formator import format_video_metadata
+from src.helper.progress_tracker import ProgressTracker
+import cryptg
 
 DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
@@ -34,11 +37,17 @@ async def extract_thumbnail(video_path: str, thumb_path: str):
 async def process_files(messages: list, reply_chat_id: int):
     """Downloads, renames, and extracts thumbnails for matching files."""
     processed_assets = []
-    await bot.send_message(reply_chat_id, "⏳ **Stage 2: Staging...**\nDownloading and processing files. This may take a moment.")
+    status_msg = await bot.send_message(
+        reply_chat_id, 
+        "⏳ **Stage 2: Staging...**\nInitializing downloads..."
+    )
+    print(cryptg.__file__)
+    total_messages = len(messages)
     for index, msg in enumerate(messages, start=1):
         try:
             logger.info(f"Downloading file {index}/{len(messages)}...")
-            original_file_path = await msg.download_media(file=DOWNLOAD_DIR)
+            tracker = ProgressTracker(status_msg, index, total_messages)
+            original_file_path = await msg.download_media(file=DOWNLOAD_DIR, progress_callback = tracker )
             if not original_file_path:
                 logger.warning(f"Failed to download media for message {msg.id}")
                 continue
@@ -46,16 +55,13 @@ async def process_files(messages: list, reply_chat_id: int):
             new_filename, final_caption = format_video_metadata(file_name) #e.g: movie.name.xxx.mp4
             new_file_path = os.path.join(DOWNLOAD_DIR, new_filename)
             os.rename(original_file_path, new_file_path)
-            
-            # 3. Thumbnail Extraction
+
             file,_ = os.path.splitext(new_filename)
             thumb_filename = f"{file}.jpg"
             thumb_file_path = os.path.join(DOWNLOAD_DIR, thumb_filename)
             
             logger.info(f"Extracting thumbnail for {new_filename}...")
             extracted_thumb = await extract_thumbnail(new_file_path, thumb_file_path)
-            
-            # 4. Package the assets for Phase 3 (Publishing)
             processed_assets.append({
                 "video": new_file_path,
                 "thumbnail": extracted_thumb,
@@ -72,12 +78,13 @@ async def process_files(messages: list, reply_chat_id: int):
     )
 
     if processed_assets:
+        # Todo: Needs a robust sort 
+        processed_assets.sort(key=lambda x: x['caption'])
         await publish_and_cleanup(processed_assets, reply_chat_id)
-    
-    # Future hand-off to publishing.py goes here
     return processed_assets
 
 async def handle_series_selection(chat_id: int, target_hash: str):
+    # Todo: Handle select the whole series
     session_data = ACTIVE_BATCHES.get(chat_id)
     if not session_data:
         await bot.send_message(chat_id, "⚠️ Session expired.")

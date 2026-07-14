@@ -12,6 +12,7 @@ class TelegramConfig:
     raw_channel: int
     shadow_channel: int
     ready_channel: int
+    tif_raw_channel: int
 
     @classmethod
     def from_env(cls) -> "TelegramConfig":
@@ -24,6 +25,7 @@ class TelegramConfig:
                 raw_channel=int(os.environ["RAW_CHANNEL_ID"]),
                 shadow_channel=int(os.environ["SHADOW_CHANNEL_ID"]),
                 ready_channel=int(os.environ["READY_TO_GO_CHANNEL_ID"]),
+                tif_raw_channel=int(os.environ["TIF_RAW_CHANNEL_ID"]),
             )
         except KeyError as e:
             raise RuntimeError(f"Missing required environment variable: {e}")

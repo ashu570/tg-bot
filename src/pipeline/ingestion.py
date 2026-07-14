@@ -29,6 +29,7 @@ async def ingest_raw_files(reply_chat_id: int, search_query: str):
     try:
         all_records = db.fetch_all_records()
         matched_db_ids = []
+        # Todo: Improve match logic to include the whole search query (If the query is Iron man, it should match only Iron man files not Iron Fist)
         for msg_id, file_name, caption in all_records:
             if (file_name and matcher.search(file_name)) or (caption and matcher.search(caption)):
                 matched_db_ids.append(msg_id)
@@ -36,12 +37,12 @@ async def ingest_raw_files(reply_chat_id: int, search_query: str):
         # Find messages from ids
         if matched_db_ids:
             #Todo: Use await userbot.get_input_entity(config.raw_channel) before any fetch to resolve fresh access hashes and prevent PeerIdInvalid errors.
-            db_msgs = await userbot.get_messages(config.raw_channel, ids=matched_db_ids)
+            db_msgs = await userbot.get_messages(config.tif_raw_channel, ids=matched_db_ids)
             matched_messages.extend([m for m in db_msgs if m is not None])
             logger.info(f"Scan complete. Found {len(matched_messages)} valid matching payloads.")
         if not matched_messages :
             #Todo: Use batching to prevent flooding and insert msg in the database so that we won't require additional sync
-            async for msg in userbot.iter_messages(config.raw_channel):
+            async for msg in userbot.iter_messages(config.tif_raw_channel):
                 if msg.media and (msg.document or msg.video):
                     file_name = ""
                     if msg.document:

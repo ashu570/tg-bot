@@ -6,6 +6,9 @@ from src.libs.user_client import bot, userbot
 from config import config
 from telethon import Button
 from src.helper.file_formator import format_video_metadata
+from src.helper.commons import common_helper
+from telethon.errors import FloodWaitError
+from telethon.tl.types import DocumentAttributeVideo
 
 LINK_BOT_USERNAME = "@Links_X_Bot"
 
@@ -83,41 +86,81 @@ async def publish_and_cleanup(processed_assets: list, reply_chat_id: int):
     )
     shadow_messages = []
     try:
+        first_caption = processed_assets[0]['caption']
+        header_text = generate_header_text(first_caption)
+        
+        try:
+            await userbot.send_message(config.shadow_channel, message=header_text)
+            logger.info("Header sent successfully.")
+        except FloodWaitError as e:
+            logger.warning(f"FloodWait on header! Sleeping for {e.seconds}s.")
+            await asyncio.sleep(e.seconds)
+            await userbot.send_message(config.shadow_channel, message=header_text)
         # Iterate through every downloaded and renamed file
         for index, asset in enumerate(processed_assets, start=1):
             filename = os.path.basename(asset['video'])
             logger.info(f"Uploading file {index}/{len(processed_assets)} to Shadow Channel...")
-            
-            # Generate the rich caption utilizing the original RAW message data
+
             rich_caption = asset['caption']
+            success = False
+            attempts = 0
+            max_attempts = 3
+            shadow_msg = None
             
-            # Upload the video + thumbnail + rich caption to the Shadow channel
-            shadow_msg = await userbot.send_file(
-                config.shadow_channel,
-                file=asset['video'],
-                thumb=asset['thumbnail'],
-                caption=rich_caption,
-                supports_streaming=True
-            )
-            
-            # Save the resulting message object (We will need this later for Step 4)
-            shadow_messages.append(shadow_msg)
-
-            # --- STRICT GARBAGE COLLECTION ---
-            # Delete the local files immediately after a successful upload
-            os.remove(asset['video'])
-            os.remove(asset['thumbnail'])
-            logger.info(f"Cleaned up local files for {filename}")
-
-        # Report final success to you for this phase
+            while not success and attempts < max_attempts:
+                try:
+                    shadow_msg = await userbot.send_file(
+                        config.shadow_channel,
+                        file=asset['video'],
+                        thumb=asset['thumbnail'],
+                        caption=rich_caption,
+                        attributes=[DocumentAttributeVideo(
+                            duration=0, 
+                            w=320, h=320, 
+                            supports_streaming=False
+                        )],
+                        # progress_callback=get_progress_logger(filename) Todo
+                    )
+                    success = True
+                except FloodWaitError as e:
+                    attempts += 1
+                    logger.warning(f"⏳ FloodWait! Sleeping for {e.seconds}s. (Attempt {attempts}/{max_attempts})")
+                    await asyncio.sleep(e.seconds)
+                except Exception as upload_err:
+                    logger.error(f"❌ Upload failed for {filename}: {upload_err}")
+                    break
+            if shadow_msg:
+                shadow_messages.append(shadow_msg)
+                if os.path.exists(asset['video']):
+                    os.remove(asset['video'])
+                if os.path.exists(asset['thumbnail']):
+                    os.remove(asset['thumbnail'])
+                logger.info(f"Cleaned up local files for {filename}")
         await bot.send_message(
             reply_chat_id, 
-            f"✅ **Shadow Archive Complete!**\nSuccessfully uploaded and formatted {len(processed_assets)} files. Local disk cleared."
+            f"✅ **Shadow Archive Complete!**\nSuccessfully uploaded and formatted {len(shadow_messages)} files. Local disk cleared."
         )
         
-        if shadow_messages :
+        if shadow_messages:
             await bridge_to_link_bot(shadow_messages, reply_chat_id, len(processed_assets))
 
     except Exception as e:
         logger.exception(f"Error during Shadow publishing phase: {e}")
         await bot.send_message(reply_chat_id, f"❌ **Error during publishing:** `{e}`")
+
+# For shadow header before upload
+def generate_header_text(file_name: str) -> str:
+    meta = common_helper.file_meta_extractor(file_name)
+    title = meta.get('title', 'Unknown Title').title()
+    year = meta.get('year')
+    season = meta.get('season', '')
+    quality = meta.get('quality', '')
+    language = meta.get('language', '')
+    year_str = f" ({year})" if year else ""
+    header = (
+        f"🎬 **{title}{year_str}**\n"
+        f"📁 **Season:** {season}\n"
+        f"📺 **Quality:** {quality}\n"
+        f"🔊 **Language:** {language}"
+    )
+    return header

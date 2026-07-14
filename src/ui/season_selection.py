@@ -19,6 +19,7 @@ async def generate_season_cards(seasons_data: dict, chat_id: int):
             cb_data = f"p|{short_hash}".encode('utf-8')
             keyboard.append([Button.inline(button_text, data=cb_data)])
         keyboard.append([
+            # Todo: Need to handle this efficiently
             Button.inline("⏬ Process ALL Qualities & Audio", data=f"p|{season}|ALL".encode('utf-8'))
         ])
         await bot.send_message(chat_id, card_text, buttons=keyboard)
