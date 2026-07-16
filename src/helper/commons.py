@@ -13,7 +13,7 @@ class CommonHelper:
         clean_name = re.sub(rf'^\d+{delim}+', '', name)
 
         #Todo: More better subtitle and audio pattern
-        audio_pattern = r'(?i)\b(hindi|english|eng|dual[\-\s_]*audio|multi[\-\s_]*audio)\b'
+        audio_pattern = r'(?i)\b(hindi|english|eng|dual|multi|dual[\-\s_]*audio|multi[\-\s_]*audio)\b'
         sub_pattern = r'(?i)\b(esub|hc[\-\s_]*esub|subs?|eng[\-\s_]*subs?)\b'
         extracted_audio = re.findall(audio_pattern, clean_name)
         extracted_subs = re.findall(sub_pattern, clean_name)
@@ -32,8 +32,8 @@ class CommonHelper:
             "episode": guessed_data.get('episode'),
             "year": guessed_data.get('year'),
             "quality": guessed_data.get('screen_size'),
-            "custom_audio": audio_tags,
-            "custom_subs": sub_tags
+            "custom_audio": ", ".join(audio_tags),
+            "custom_subs": ", ".join(sub_tags)
         }
         return metadata
     

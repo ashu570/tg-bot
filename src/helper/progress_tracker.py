@@ -36,7 +36,7 @@ class ProgressTracker:
             f"⏳ **{self.type}ing File {self.file_index} of {self.total_files}**\n"
             f"📊 **Progress:** {percent:.1f}% ({current_mb:.1f} MB / {total_mb:.1f} MB)\n"
             f"🚀 **Speed:** {speed_mb:.2f} MB/s\n"
-            f"⏱ **ETA:** {math.ceil(eta)} seconds"
+            f"⏱ **ETA:** {eta}"
         )
         
         try:

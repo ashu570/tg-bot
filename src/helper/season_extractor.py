@@ -6,30 +6,18 @@ from src.helper.commons import common_helper
 #Todo: Optimize
 def extract_metadata(text: str) -> tuple:
     season, episode, quality, language = "Unknown", "Unknown", "Unknown", "Unknown"
-    s_match = re.search(r'[Ss](\d+)', text)
-    e_match = re.search(r'[Ee](\d+)', text)
     q_match = re.search(r'(2160[pP]|1080[pP]|720[pP]|480[pP]|4[kK])', text)
-
     text_lower = text.lower()
-    title = common_helper.clean_file_name(text_lower)
-    if 'dual' in text_lower or 'multi' in text_lower:
-        language = "Dual Audio"
-    elif 'hindi' in text_lower:
-        language = "Hindi"
-    elif 'english' in text_lower:
-        language = "English"
-    else:
-        language = 'Multi Lang'
-
-    if s_match and e_match:
-        season = f"S{int(s_match.group(1)):02d}"
-        episode = f"E{int(e_match.group(1)):02d}"
+    file_meta = common_helper.file_meta_extractor(text_lower)
+    if file_meta.get('season') and file_meta.get('episode'):
+        season = f"S{file_meta.get('season'):02d}"
+        episode = f"E{file_meta.get('episode'):02d}"
     else: # For movie
         season = "Movie"
-        episode = title if title else "Full Movie"
+        episode = file_meta.get('title', 'Full Movie')
 
     quality = q_match.group(1).lower() if q_match else "NA"
-    return season, episode, quality, language, title
+    return season, episode, quality, file_meta.get("language",''), file_meta.get('title', 'Default')
 
 def segregate_and_dedupe(messages: list[Message]) -> dict:
     """
