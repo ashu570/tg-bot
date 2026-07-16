@@ -5,6 +5,7 @@ from src.pipeline.processing import process_files
 from src.plugin.indexer import db
 from src.helper.season_extractor import segregate_and_dedupe
 from src.ui.season_selection import generate_season_cards
+from src.helper.commons import ACTIVE_BATCHES
 import re
 
 def build_smart_regex(search_text: str) -> re.Pattern:
@@ -25,6 +26,7 @@ def build_smart_regex(search_text: str) -> re.Pattern:
 async def ingest_raw_files(reply_chat_id: int, search_query: str):
     logger.info(f"Starting precise local scan on RAW channel for: '{search_query}'")
     matched_messages = []
+    ACTIVE_BATCHES.clear()
     matcher = build_smart_regex(search_query)
     try:
         all_records = db.fetch_all_records()
@@ -33,8 +35,6 @@ async def ingest_raw_files(reply_chat_id: int, search_query: str):
         for msg_id, file_name, caption in all_records:
             if (file_name and matcher.search(file_name)) or (caption and matcher.search(caption)):
                 matched_db_ids.append(msg_id)
-
-        # Find messages from ids
         if matched_db_ids:
             #Todo: Use await userbot.get_input_entity(config.raw_channel) before any fetch to resolve fresh access hashes and prevent PeerIdInvalid errors.
             db_msgs = await userbot.get_messages(config.tif_raw_channel, ids=matched_db_ids)
@@ -58,10 +58,7 @@ async def ingest_raw_files(reply_chat_id: int, search_query: str):
             logger.info(f"Scan complete. Found {len(matched_messages)} valid matching payloads.")
         
         if matched_messages:
-            await bot.send_message(
-                reply_chat_id, 
-                f"Found **{len(matched_messages)}** files matching `{search_query}`."
-            )
+            #Todo: Add a bot message for duplicate entries
             seasons_data = segregate_and_dedupe(matched_messages)
             if not seasons_data:
                 await bot.send_message(reply_chat_id, "⚠️ Found files, but could not parse valid Season/Episode metadata.")
@@ -70,12 +67,9 @@ async def ingest_raw_files(reply_chat_id: int, search_query: str):
             await bot.send_message(
                 reply_chat_id, 
                 f"Found **{len(matched_messages)}** raw files.\n"
-                f"✅ Segregated into **{len(seasons_data)}** unique seasons. Passing to processor..."
+                f"✅ Segregated into **{len(seasons_data)}** unique seasons."
             )
-
             await generate_season_cards(seasons_data, reply_chat_id)
-
-            # await process_files(matched_messages, reply_chat_id)
         else:
             await bot.send_message(
                 reply_chat_id, 

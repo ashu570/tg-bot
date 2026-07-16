@@ -9,6 +9,7 @@ from src.helper.file_formator import format_video_metadata
 from src.helper.commons import common_helper
 from telethon.errors import FloodWaitError
 from telethon.tl.types import DocumentAttributeVideo
+from src.helper.progress_tracker import ProgressTracker
 
 LINK_BOT_USERNAME = "@Links_X_Bot"
 
@@ -80,6 +81,9 @@ async def bridge_to_link_bot(shadow_messages: list, reply_chat_id: int, batch_si
         await bot.send_message(reply_chat_id, f"❌ **Error during bridging:** `{e}`")
 
 async def publish_and_cleanup(processed_assets: list, reply_chat_id: int):
+    if not processed_assets:
+        logger.error("Empty payload received for upload. Aborting.")
+        return
     await bot.send_message(
         reply_chat_id, 
         "🚀 **Stage 3: Publishing to Shadow...**\nUploading individual formatted posts to the archive."
@@ -88,7 +92,7 @@ async def publish_and_cleanup(processed_assets: list, reply_chat_id: int):
     try:
         first_caption = processed_assets[0]['caption']
         header_text = generate_header_text(first_caption)
-        
+        total_assets = len(processed_assets)
         try:
             await userbot.send_message(config.shadow_channel, message=header_text)
             logger.info("Header sent successfully.")
@@ -96,17 +100,18 @@ async def publish_and_cleanup(processed_assets: list, reply_chat_id: int):
             logger.warning(f"FloodWait on header! Sleeping for {e.seconds}s.")
             await asyncio.sleep(e.seconds)
             await userbot.send_message(config.shadow_channel, message=header_text)
+        status_msg = await bot.send_message(reply_chat_id, "⏳ **Stage 2: Staging...**\nInitializing Upload...") #The message that gets updated later to show progress
         # Iterate through every downloaded and renamed file
         for index, asset in enumerate(processed_assets, start=1):
             filename = os.path.basename(asset['video'])
             logger.info(f"Uploading file {index}/{len(processed_assets)} to Shadow Channel...")
-
             rich_caption = asset['caption']
             success = False
             attempts = 0
             max_attempts = 3
             shadow_msg = None
-            
+            # Todo: Add update message in progress tracker 
+            tracker = ProgressTracker(status_msg, index, total_assets, 'Upload')
             while not success and attempts < max_attempts:
                 try:
                     shadow_msg = await userbot.send_file(
@@ -119,7 +124,7 @@ async def publish_and_cleanup(processed_assets: list, reply_chat_id: int):
                             w=320, h=320, 
                             supports_streaming=False
                         )],
-                        # progress_callback=get_progress_logger(filename) Todo
+                        progress_callback= tracker
                     )
                     success = True
                 except FloodWaitError as e:

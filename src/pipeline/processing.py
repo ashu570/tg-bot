@@ -46,24 +46,23 @@ async def process_files(messages: list, reply_chat_id: int):
     for index, msg in enumerate(messages, start=1):
         try:
             logger.info(f"Downloading file {index}/{len(messages)}...")
-            tracker = ProgressTracker(status_msg, index, total_messages)
-            original_file_path = await msg.download_media(file=DOWNLOAD_DIR, progress_callback = tracker )
+            tracker = ProgressTracker(status_msg, index, total_messages, "Download")
+            new_filename, final_caption = format_video_metadata(msg.file.name if msg.file else msg.text)
+            custom_file_path = os.path.join(DOWNLOAD_DIR, new_filename if new_filename else '')
+            original_file_path = await msg.download_media(file=custom_file_path, progress_callback = tracker )
             if not original_file_path:
                 logger.warning(f"Failed to download media for message {msg.id}")
                 continue
-            file_name = os.path.basename(original_file_path)
-            new_filename, final_caption = format_video_metadata(file_name) #e.g: movie.name.xxx.mp4
-            new_file_path = os.path.join(DOWNLOAD_DIR, new_filename)
-            os.rename(original_file_path, new_file_path)
-
             file,_ = os.path.splitext(new_filename)
             thumb_filename = f"{file}.jpg"
             thumb_file_path = os.path.join(DOWNLOAD_DIR, thumb_filename)
             
             logger.info(f"Extracting thumbnail for {new_filename}...")
-            extracted_thumb = await extract_thumbnail(new_file_path, thumb_file_path)
+            extracted_thumb = await extract_thumbnail(custom_file_path, thumb_file_path)
+            # Todo: Extreme priority download and upload immediately
+            # Todo: Attach a sticker once the upload is done for all the files
             processed_assets.append({
-                "video": new_file_path,
+                "video": custom_file_path,
                 "thumbnail": extracted_thumb,
                 "original_message": msg,
                 "caption": final_caption
