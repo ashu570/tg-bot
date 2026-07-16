@@ -1,6 +1,9 @@
 import re
 import os
+import aiohttp
 from guessit import guessit
+from typing import Optional, Any
+from src.libs.logger import logger
 
 class CommonHelper:
     def clean_file_name(self, text:str):
@@ -17,9 +20,7 @@ class CommonHelper:
         sub_pattern = r'(?i)\b(esub|hc[\-\s_]*esub|subs?|eng[\-\s_]*subs?)\b'
         extracted_audio = re.findall(audio_pattern, clean_name)
         extracted_subs = re.findall(sub_pattern, clean_name)
-
-        # Clean up the extracted tags (lowercase, remove hyphens/underscores for consistency)
-        # Using a set to remove duplicates if a tag appears twice
+        
         audio_tags = list(set([a.lower().replace('-', ' ').replace('_', ' ') for a in extracted_audio]))
         sub_tags = list(set([s.lower().replace('-', ' ').replace('_', ' ') for s in extracted_subs]))
 
@@ -36,6 +37,28 @@ class CommonHelper:
             "custom_subs": ", ".join(sub_tags)
         }
         return metadata
+    
+    async def make_request(self, url: str, method: str = "GET", response_format: str = "json", **kwargs) -> Any:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.request(method, url, **kwargs) as response:
+                    if response.status != 200:
+                        logger.error(f"HTTP Error {response.status} for {url}")
+                        return None
+                    if response_format == "json":
+                        return await response.json()
+                    elif response_format == "bytes":
+                        return await response.read()
+                    else:
+                        return await response.text()
+                    
+            if os.name == 'nt':
+                import asyncio
+                await asyncio.sleep(0.25) #We sleep for 0.25 second so Windows doesn't panic, look for Exception in callback _ProactorBasePipeTransport
+            return data
+        except Exception as e:
+            logger.exception(f"Request failed for {url}: {e}")
+            return None
     
 common_helper = CommonHelper()
 ACTIVE_BATCHES = {}

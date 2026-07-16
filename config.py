@@ -13,6 +13,9 @@ class TelegramConfig:
     shadow_channel: int
     ready_channel: int
     tif_raw_channel: int
+    tmdb_api_key:str
+    tmdb_base_url:str
+    tmdb_base_image_url:str
 
     @classmethod
     def from_env(cls) -> "TelegramConfig":
@@ -26,6 +29,9 @@ class TelegramConfig:
                 shadow_channel=int(os.environ["SHADOW_CHANNEL_ID"]),
                 ready_channel=int(os.environ["READY_TO_GO_CHANNEL_ID"]),
                 tif_raw_channel=int(os.environ["TIF_RAW_CHANNEL_ID"]),
+                tmdb_api_key= os.environ["TMDB_API_KEY"],
+                tmdb_base_url= os.environ["TMDB_BASE_URL"],
+                tmdb_base_image_url= os.environ["TMDB_IMAGE_BASE_URL"],
             )
         except KeyError as e:
             raise RuntimeError(f"Missing required environment variable: {e}")
