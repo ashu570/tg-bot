@@ -66,14 +66,12 @@ async def ingest_raw_files(reply_chat_id: int, search_query: str):
 
             await bot.send_message(
                 reply_chat_id, 
-                f"Found **{len(matched_messages)}** raw files.\n"
-                f"✅ Segregated into **{len(seasons_data)}** unique seasons."
-            )
+                f"✅ Found **{len(matched_messages)}** files.\n Assembling files to relevant seasons"            )
             await generate_season_cards(seasons_data, reply_chat_id)
         else:
             await bot.send_message(
                 reply_chat_id, 
-                f"❌ No files matching `{search_query}` were found in the channel history."
+                f"No files matching `{search_query}` were found in the channel history."
             )
 
     except Exception as e:

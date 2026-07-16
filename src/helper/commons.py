@@ -1,6 +1,7 @@
 import re
 import os
 import aiohttp
+import shutil
 from guessit import guessit
 from typing import Optional, Any
 from src.libs.logger import logger
@@ -59,6 +60,12 @@ class CommonHelper:
         except Exception as e:
             logger.exception(f"Request failed for {url}: {e}")
             return None
+        
+    def clean_directory(self, dir_path: str):
+        logger.info(f"Cleaning {dir_path}")
+        if os.path.exists(dir_path):
+            shutil.rmtree(dir_path)
+        os.makedirs(dir_path, exist_ok=True)
     
 common_helper = CommonHelper()
 ACTIVE_BATCHES = {}

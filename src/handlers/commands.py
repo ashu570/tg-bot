@@ -14,8 +14,6 @@ async def trigger_processing(event):
     if not search_query:
         await event.respond("⚠️ Please provide a search term. Example: `/process named video`")
         return
-        
-    await event.respond(f"🔍 Initializing optimized search for: `{search_query}`...")
     asyncio.create_task(ingest_raw_files(event.chat_id, search_query))
 
 @bot.on(events.CallbackQuery(pattern=b'^p\|'))
