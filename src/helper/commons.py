@@ -39,9 +39,11 @@ class CommonHelper:
         }
         return metadata
     
+    #Use this method to call APIs 
     async def make_request(self, url: str, method: str = "GET", response_format: str = "json", **kwargs) -> Any:
         try:
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=10.0) #Remove it if we ever need to get rid of the max timeout
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.request(method, url, **kwargs) as response:
                     if response.status != 200:
                         logger.error(f"HTTP Error {response.status} for {url}")

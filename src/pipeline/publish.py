@@ -57,7 +57,7 @@ async def bridge_to_link_bot(shadow_messages: list, reply_chat_id: int, batch_si
             "Tap the button below to securely access your files."
             f"📥 **Access Batch:** {batch_link}"
         )
-        # To be tested
+        # Todo: To be tested
         # target_entity = await userbot.get_input_entity(config.shadow_channel)
         # await bot.send_message(
         #     target_entity, 
@@ -65,7 +65,7 @@ async def bridge_to_link_bot(shadow_messages: list, reply_chat_id: int, batch_si
         #     buttons=[Button.url("📥 Access Batch", batch_link)]
         # )
         await userbot.send_message(
-            config.shadow_channel,
+            config.ready_channel,
             final_caption
         )
         await bot.send_message(
@@ -80,78 +80,32 @@ async def bridge_to_link_bot(shadow_messages: list, reply_chat_id: int, batch_si
         logger.exception(f"Error during bridging phase: {e}")
         await bot.send_message(reply_chat_id, f"❌ **Error during bridging:** `{e}`")
 
-async def publish_and_cleanup(processed_assets: list, reply_chat_id: int):
-    if not processed_assets:
-        logger.error("Empty payload received for upload. Aborting.")
-        return
-    await bot.send_message(
-        reply_chat_id, 
-        "🚀 **Stage 3: Publishing to Shadow...**\nUploading individual formatted posts to the archive."
-    )
-    shadow_messages = []
-    try:
-        first_caption = processed_assets[0]['caption']
-        header_text = generate_header_text(first_caption)
-        total_assets = len(processed_assets)
+async def publish_and_cleanup(asset: dict, tracker):
+    success = False
+    attempts = 0
+    max_attempts = 3
+    shadow_msg = None
+    while not success and attempts < max_attempts:
         try:
-            await userbot.send_message(config.shadow_channel, message=header_text)
-            logger.info("Header sent successfully.")
+            shadow_msg = await userbot.send_file(
+                config.shadow_channel,
+                file=asset['video'],
+                thumb=asset['thumbnail'],
+                caption=asset['caption'],
+                attributes=[DocumentAttributeVideo(
+                    duration=0, w=150, h=170, supports_streaming=False
+                )],
+                progress_callback=tracker
+            )
+            success = True
+            await asyncio.sleep(2)
         except FloodWaitError as e:
-            logger.warning(f"FloodWait on header! Sleeping for {e.seconds}s.")
+            attempts += 1
             await asyncio.sleep(e.seconds)
-            await userbot.send_message(config.shadow_channel, message=header_text)
-        status_msg = await bot.send_message(reply_chat_id, "⏳ **Stage 2: Staging...**\nInitializing Upload...") #The message that gets updated later to show progress
-        # Iterate through every downloaded and renamed file
-        for index, asset in enumerate(processed_assets, start=1):
-            filename = os.path.basename(asset['video'])
-            logger.info(f"Uploading file {index}/{len(processed_assets)} to Shadow Channel...")
-            rich_caption = asset['caption']
-            success = False
-            attempts = 0
-            max_attempts = 3
-            shadow_msg = None
-            # Todo: Add update message in progress tracker 
-            tracker = ProgressTracker(status_msg, index, total_assets, 'Upload')
-            while not success and attempts < max_attempts:
-                try:
-                    shadow_msg = await userbot.send_file(
-                        config.shadow_channel,
-                        file=asset['video'],
-                        thumb=asset['thumbnail'],
-                        caption=rich_caption,
-                        attributes=[DocumentAttributeVideo(
-                            duration=0, 
-                            w=320, h=320, 
-                            supports_streaming=False
-                        )],
-                        progress_callback= tracker
-                    )
-                    success = True
-                except FloodWaitError as e:
-                    attempts += 1
-                    logger.warning(f"⏳ FloodWait! Sleeping for {e.seconds}s. (Attempt {attempts}/{max_attempts})")
-                    await asyncio.sleep(e.seconds)
-                except Exception as upload_err:
-                    logger.error(f"❌ Upload failed for {filename}: {upload_err}")
-                    break
-            if shadow_msg:
-                shadow_messages.append(shadow_msg)
-                if os.path.exists(asset['video']):
-                    os.remove(asset['video'])
-                if os.path.exists(asset['thumbnail']):
-                    os.remove(asset['thumbnail'])
-                logger.info(f"Cleaned up local files for {filename}")
-        await bot.send_message(
-            reply_chat_id, 
-            f"✅ **Shadow Archive Complete!**\nSuccessfully uploaded and formatted {len(shadow_messages)} files. Local disk cleared."
-        )
-        
-        if shadow_messages:
-            await bridge_to_link_bot(shadow_messages, reply_chat_id, len(processed_assets))
+        except Exception:
+            break
 
-    except Exception as e:
-        logger.exception(f"Error during Shadow publishing phase: {e}")
-        await bot.send_message(reply_chat_id, f"❌ **Error during publishing:** `{e}`")
+    return shadow_msg
 
 # For shadow header before upload
 def generate_header_text(file_name: str) -> str:
