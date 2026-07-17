@@ -13,11 +13,8 @@ from src.helper.progress_tracker import ProgressTracker
 
 LINK_BOT_USERNAME = "@Links_X_Bot"
 
-async def bridge_to_link_bot(shadow_messages: list, reply_chat_id: int, batch_size: int):
-    """
-    Step 4 & 5: Executes the specific /batch workflow with Link_X_Bot,
-    extracts the URL, and publishes to the Ready channel.
-    """
+async def bridge_to_link_bot(shadow_messages: list, reply_chat_id: int, batch_size: int, series_meta:dict, thumbnail = None):
+    # Todo: Implement a season + language based batching, after all the batching are done send message to ready
     await bot.send_message(reply_chat_id, "🔗 **Stage 4: Bridging...**\nExecuting batch command with link generator...")
     
     try:
@@ -51,12 +48,7 @@ async def bridge_to_link_bot(shadow_messages: list, reply_chat_id: int, batch_si
             if not batch_link:
                 raise asyncio.TimeoutError("The link was never found in the bot's messages.")
         await bot.send_message(reply_chat_id, "📢 **Stage 5: Finalizing...**\nPublishing to Ready channel.")
-        final_caption = (
-            "🎬 **New Video Batch Ready!**\n\n"
-            f"📦 **Total Files in Batch:** {batch_size}\n\n"
-            "Tap the button below to securely access your files."
-            f"📥 **Access Batch:** {batch_link}"
-        )
+        final_caption = generate_final_message(series_meta, batch_link)
         # Todo: To be tested
         # target_entity = await userbot.get_input_entity(config.shadow_channel)
         # await bot.send_message(
@@ -66,9 +58,10 @@ async def bridge_to_link_bot(shadow_messages: list, reply_chat_id: int, batch_si
         # )
         await userbot.send_message(
             config.ready_channel,
-            final_caption
+            final_caption,
+            file=thumbnail if thumbnail and os.path.exists(thumbnail) else None
         )
-        await bot.send_message(
+        await bot.send_message(  
             reply_chat_id, 
             f"🎉 **Pipeline Complete!**\nSuccessfully processed and published a batch of {batch_size} files."
         )
@@ -123,3 +116,25 @@ def generate_header_text(file_name: str) -> str:
         f"🔊 **Language:** {language}"
     )
     return header
+
+def generate_final_message(metadata: dict, batch_link:str) -> str:
+    title = metadata.get("title", "UNKNOWN TITLE").upper()
+    year = metadata.get("year", "")
+    season = metadata.get("season", "1")
+    audio = metadata.get("custom_audio", "").upper()
+    sub = metadata.get("subtitles", "👍")
+    quality = metadata.get("quality", "720P").upper()
+    caption = (
+        f"🎭 {title} • {year}\n"
+        f"📁 SEASON - {season}\n"
+        f"🎧 AUDIO - {audio}\n"
+        f"💬 SUBTITLES {sub}\n"
+        f"\n"
+        f"📦 QUALITY - || {quality} ||\n"
+        f"📦 {batch_link} ||\n"
+        f"\n"
+        f"༄༅──────────────༅༄\n"
+        f"@TIFDiscuss 🌹 @TIF_WebSeries"
+    )
+    
+    return caption

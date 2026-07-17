@@ -23,11 +23,11 @@ async def generate_season_cards(seasons_data: dict, chat_id: int):
             Button.inline("⏬ Process ALL Qualities & Audio", data=f"p|{season}|ALL".encode('utf-8'))
         ])
         await bot.send_message(chat_id, card_text, buttons=keyboard)
-    if len(seasons_data) > 1 or (len(seasons_data) == 1 and "Movie" not in seasons_data):
-        final_text = "📦 **Series Processing**\nDo you want to process everything across all seasons?"
-        final_keyboard = [
-            [Button.inline("🚀 Process Entire Series", data=b"p_all_series")]
-        ]
-        await bot.send_message(chat_id, final_text, buttons=final_keyboard)
+    # if len(seasons_data) > 1 or (len(seasons_data) == 1 and "Movie" not in seasons_data):
+    #     final_text = "📦 **Series Processing**\nDo you want to process everything across all seasons?"
+    #     final_keyboard = [
+    #         [Button.inline("🚀 Process Entire Series", data=b"p_all_series")]
+    #     ]
+    #     await bot.send_message(chat_id, final_text, buttons=final_keyboard)
         
     logger.info("Successfully generated and sent UI selection cards.")

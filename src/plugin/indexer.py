@@ -33,11 +33,11 @@ class SQLiteIndexer:
     def fetch_all_records(self) -> list:
         try:
             logger.info("Inside SQLiteIndexer -> fetch_all_records")
-            result = self.cursor.execute("SELECT message_id, file_name, caption FROM files")
-            return result[0] if result[0] is not None else 0
+            self.cursor.execute("SELECT message_id, file_name, caption FROM files")
+            return self.cursor.fetchall()
         except Exception as e:
             logger.error(f"CAUGHT: Error in SQLiteIndexer -> fetch_all_records {e}")
-        return self.cursor.fetchall()
+            return []
 
     def save_new_files(self, file_batch: list):
         if not file_batch:

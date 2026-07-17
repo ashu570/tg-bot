@@ -1,6 +1,7 @@
 import os
 import re
 import asyncio
+import shutil
 from src.libs.logger import logger
 from src.libs.user_client import bot
 from src.pipeline.publish import publish_and_cleanup,generate_header_text, bridge_to_link_bot
@@ -49,6 +50,7 @@ async def process_files(messages: list, reply_chat_id: int):
     _, first_caption = format_video_metadata(first_msg_name)
     tmdb_result = await fetch_meta_from_tmdb(common_helper.clean_file_name(first_msg_name))
     header_text = generate_header_text(first_caption)
+    bridge_thumb_path = None
     try:
         await userbot.send_message(config.shadow_channel, message=header_text)
     except FloodWaitError as e:
@@ -58,6 +60,7 @@ async def process_files(messages: list, reply_chat_id: int):
     total_messages = len(messages)
     shadow_messages = []
     failed_files = []
+    success_files = []
 
     for index, msg in enumerate(messages, start=1):
         raw_name = msg.file.name if msg.file else msg.text
@@ -80,6 +83,9 @@ async def process_files(messages: list, reply_chat_id: int):
                     extracted_thumb = thumb_file_path
             if not extracted_thumb:
                 extracted_thumb = await extract_thumbnail(custom_file_path, thumb_file_path)
+            if not bridge_thumb_path and extracted_thumb:
+                bridge_thumb_path = os.path.join(DOWNLOAD_DIR, "bridge_thumb_preserved.jpg")
+                shutil.copy(extracted_thumb, bridge_thumb_path)
             asset = {
                 "video": custom_file_path,
                 "thumbnail": extracted_thumb,
@@ -88,6 +94,7 @@ async def process_files(messages: list, reply_chat_id: int):
             tracker = ProgressTracker(status_msg, index, total_messages, 'Upload')
             shadow_msg = await publish_and_cleanup(asset, tracker)
             if shadow_msg:
+                success_files.append(new_filename)
                 shadow_messages.append(shadow_msg)
             else:
                 failed_files.append(new_filename)
@@ -99,7 +106,7 @@ async def process_files(messages: list, reply_chat_id: int):
             if extracted_thumb and os.path.exists(extracted_thumb):
                 os.remove(extracted_thumb)
     if shadow_messages:
-        await bridge_to_link_bot(shadow_messages, reply_chat_id, total_messages)
+        await bridge_to_link_bot(shadow_messages, reply_chat_id, total_messages, common_helper.file_meta_extractor(success_files[0]), bridge_thumb_path)
     if failed_files:
         failed_text = "\n".join([f"❌ `{f}`" for f in failed_files])
         await bot.send_message(
@@ -111,7 +118,8 @@ async def process_files(messages: list, reply_chat_id: int):
             reply_chat_id, 
             f"✅ Archive Complete!\nSuccessfully processed and uploaded {len(shadow_messages)} files."
         )
-
+    if bridge_thumb_path and os.path.exists(bridge_thumb_path):
+        os.remove(bridge_thumb_path)
     return shadow_messages
 
 async def handle_series_selection(chat_id: int, target_hash: str):
