@@ -5,7 +5,7 @@ from src.helper.commons import common_helper
 
 #Todo: Optimize
 def extract_metadata(text: str) -> tuple:
-    season, episode, quality, language = "Unknown", "Unknown", "Unknown", "Unknown"
+    season, episode = "Unknown", "Unknown"
     q_match = re.search(r'(2160[pP]|1080[pP]|720[pP]|480[pP]|4[kK])', text)
     text_lower = text.lower()
     file_meta = common_helper.file_meta_extractor(text_lower)
@@ -17,7 +17,7 @@ def extract_metadata(text: str) -> tuple:
         episode = file_meta.get('title', 'Full Movie')
 
     quality = q_match.group(1).lower() if q_match else "NA"
-    return season, episode, quality, file_meta.get("language",''), file_meta.get('title', 'Default')
+    return season, episode, quality, file_meta.get("custom_audio",''), file_meta.get('title', 'Default')
 
 def segregate_and_dedupe(messages: list[Message]) -> dict:
     """

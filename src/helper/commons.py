@@ -16,15 +16,12 @@ class CommonHelper:
         delim = r'[\.\-\_\$\&\%\#\*\s]'
         clean_name = re.sub(rf'^\d+{delim}+', '', name)
 
-        #Todo: More better subtitle and audio pattern
-        audio_pattern = r'(?i)\b(hindi|english|eng|dual|multi|dual[\-\s_]*audio|multi[\-\s_]*audio)\b'
-        sub_pattern = r'(?i)\b(esub|hc[\-\s_]*esub|subs?|eng[\-\s_]*subs?)\b'
-        extracted_audio = re.findall(audio_pattern, clean_name)
-        extracted_subs = re.findall(sub_pattern, clean_name)
+        audio_pattern = r'(?i)(?<![a-z])(hindi|hin|english|eng|dual|multi)(?:[\s/*._$&#\-]*audio)?(?![a-z])'
+        sub_pattern = r'(?i)(?<![a-z])(e|m|multi|dual|h|kor|spanish|hin|eng|hindi|english|engish|korean|german|ger|it|italian|ru|russian)?[\s/*._$&#\-]*(?:subs?|subtitles?)(?![a-z])'
+        extracted_audio_raw = [lang.lower() for lang in re.findall(audio_pattern, re.sub(sub_pattern, '', name))]
+        audio_tags = [language_map.get(lang, lang) for lang in extracted_audio_raw]
+        sub_tags = [lang.lower() for lang in re.findall(sub_pattern, name) if lang]
         
-        audio_tags = list(set([a.lower().replace('-', ' ').replace('_', ' ') for a in extracted_audio]))
-        sub_tags = list(set([s.lower().replace('-', ' ').replace('_', ' ') for s in extracted_subs]))
-
         guessed_data = guessit(clean_name)
         title = guessed_data.get('title', clean_name)
         final_title = re.sub(r'\s+', ' ', str(title)).strip().title()
@@ -71,3 +68,25 @@ class CommonHelper:
     
 common_helper = CommonHelper()
 ACTIVE_BATCHES = {}
+language_map = {
+    'e': 'English',
+    'eng': 'English',
+    'english': 'English',
+    'h': 'Hindi',
+    'hin': 'Hindi',
+    'hindi': 'Hindi',
+    'm': 'Multi',
+    'multi': 'Multi',
+    'dual': 'Dual',
+    'kor': 'Korean',
+    'korean': 'Korean',
+    'ger': 'German',
+    'german': 'German',
+    'it': 'Italian',
+    'italian': 'Italian',
+    'ru': 'Russian',
+    'russian': 'Russian',
+    'spanish': 'Spanish',
+    'dual': "Dual",
+    'multi': "Multi"
+}

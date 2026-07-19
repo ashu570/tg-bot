@@ -2,11 +2,7 @@ import sqlite3
 import os
 from src.libs.logger import logger
 
-# Automatically detect the operating system to prevent path crashes
-if os.name == 'nt':  
-    DEFAULT_DB_PATH = "raw_channel_index.db"
-else:
-    DEFAULT_DB_PATH = "/home/ubuntu/raw_channel_index.db"
+DEFAULT_DB_PATH = "raw_channel_index.db"
 
 class SQLiteIndexer:
     def __init__(self, db_path=DEFAULT_DB_PATH): 

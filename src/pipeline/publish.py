@@ -88,6 +88,7 @@ async def publish_and_cleanup(asset: dict, tracker):
                 attributes=[DocumentAttributeVideo(
                     duration=0, w=150, h=170, supports_streaming=False
                 )],
+                force_document=True,
                 progress_callback=tracker
             )
             success = True

@@ -16,7 +16,7 @@ async def trigger_processing(event):
         return
     asyncio.create_task(ingest_raw_files(event.chat_id, search_query))
 
-@bot.on(events.CallbackQuery(pattern=b'^p\|'))
+@bot.on(events.CallbackQuery(pattern=rb'^p\|'))
 async def handle_season_processing(event):
     data = event.data.decode('utf-8')
     _, target_hash = data.split('|')
