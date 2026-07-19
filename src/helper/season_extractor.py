@@ -17,7 +17,7 @@ def extract_metadata(text: str) -> tuple:
         episode = file_meta.get('title', 'Full Movie')
 
     quality = q_match.group(1).lower() if q_match else "NA"
-    return season, episode, quality, file_meta.get("custom_audio",''), file_meta.get('title', 'Default')
+    return season, episode, quality, ". ".join(file_meta.get("custom_audio",[])), file_meta.get('title', 'Default')
 
 def segregate_and_dedupe(messages: list[Message]) -> dict:
     """

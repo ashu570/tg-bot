@@ -31,8 +31,8 @@ class CommonHelper:
             "episode": guessed_data.get('episode'),
             "year": guessed_data.get('year'),
             "quality": guessed_data.get('screen_size'),
-            "custom_audio": ", ".join(audio_tags),
-            "custom_subs": ", ".join(sub_tags)
+            "custom_audio": audio_tags,
+            "custom_subs": sub_tags
         }
         return metadata
     

@@ -61,10 +61,6 @@ async def bridge_to_link_bot(shadow_messages: list, reply_chat_id: int, batch_si
             final_caption,
             file=thumbnail if thumbnail and os.path.exists(thumbnail) else None
         )
-        await bot.send_message(  
-            reply_chat_id, 
-            f"🎉 **Pipeline Complete!**\nSuccessfully processed and published a batch of {batch_size} files."
-        )
 
     except asyncio.TimeoutError:
         logger.error("Timed out waiting for the final link from the bot.")
@@ -122,14 +118,14 @@ def generate_final_message(metadata: dict, batch_link:str) -> str:
     title = metadata.get("title", "UNKNOWN TITLE").upper()
     year = metadata.get("year", "")
     season = metadata.get("season", "1")
-    audio = metadata.get("custom_audio", "").upper()
-    sub = metadata.get("subtitles", "👍")
+    audio = ", ".join(metadata.get("custom_audio", []))
+    sub = metadata.get("custom_subs", "[]")
     quality = metadata.get("quality", "720P").upper()
     caption = (
         f"🎭 {title} • {year}\n"
         f"📁 SEASON - {season}\n"
         f"🎧 AUDIO - {audio}\n"
-        f"💬 SUBTITLES {sub}\n"
+        f"💬 SUBTITLES {'👍' if len(sub) else '👎'}\n"
         f"\n"
         f"📦 QUALITY - || {quality} ||\n"
         f"📦 {batch_link} ||\n"

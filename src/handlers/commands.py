@@ -20,7 +20,4 @@ async def trigger_processing(event):
 async def handle_season_processing(event):
     data = event.data.decode('utf-8')
     _, target_hash = data.split('|')
-    
-    await event.answer("Initializing batch...", alert=False)
-    await event.edit("⏳ **Initializing Processing...**")
     asyncio.create_task(handle_series_selection(event.chat_id, target_hash))
