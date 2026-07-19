@@ -3,7 +3,7 @@ from telethon import events
 from src.libs.logger import logger
 from src.libs.user_client import bot
 from src.pipeline.ingestion import ingest_raw_files 
-from src.helper.commons import ACTIVE_BATCHES
+from src.helper.commons import ACTIVE_BATCHES, CANCELLED_EVENTS, ACTIVE_SEASON_CARDS
 from src.pipeline.processing import handle_series_selection
 
 @bot.on(events.NewMessage(pattern=r'^/process (.+)$', incoming=True))
@@ -20,4 +20,23 @@ async def trigger_processing(event):
 async def handle_season_processing(event):
     data = event.data.decode('utf-8')
     _, target_hash = data.split('|')
+    chat_id = event.chat_id
+
+    message_ids = ACTIVE_SEASON_CARDS.get(chat_id, [])
+    if message_ids:
+        try:
+            await bot.delete_messages(chat_id, message_ids)
+        except Exception as e:
+            logger.error(f"Failed to delete season cards: {e}")
+        finally:
+            ACTIVE_SEASON_CARDS.pop(chat_id, None)
     asyncio.create_task(handle_series_selection(event.chat_id, target_hash))
+
+@bot.on(events.CallbackQuery(pattern=rb'cancel\|(\d+)'))
+async def handle_cancel_processing(event):
+    chat_id = int(event.pattern_match.group(1))
+    if chat_id in CANCELLED_EVENTS:
+        CANCELLED_EVENTS[chat_id].set()
+        await event.answer("Stopping process safely... Please wait.", alert=True)
+    else:
+        await event.answer("No active process to cancel.", alert=True)

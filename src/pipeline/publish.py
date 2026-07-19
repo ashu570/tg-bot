@@ -9,7 +9,7 @@ from src.helper.file_formator import format_video_metadata
 from src.helper.commons import common_helper
 from telethon.errors import FloodWaitError
 from telethon.tl.types import DocumentAttributeVideo
-from src.helper.progress_tracker import ProgressTracker
+from src.helper.progress_tracker import ProgressTracker, ProcessCancelledError
 
 LINK_BOT_USERNAME = "@Links_X_Bot"
 
@@ -89,10 +89,15 @@ async def publish_and_cleanup(asset: dict, tracker):
             )
             success = True
             await asyncio.sleep(2)
+        except ProcessCancelledError:
+            logger.info(f"Upload interrupted by user cancellation for: {asset.get('video')}")
+            raise
         except FloodWaitError as e:
+            logger.warning(f"FloodWaitError during upload. Sleeping for {e.seconds}s.")
             attempts += 1
             await asyncio.sleep(e.seconds)
         except Exception:
+            logger.error(f"Unexpected error during upload: {e}", exc_info=True)
             break
 
     return shadow_msg
@@ -104,13 +109,13 @@ def generate_header_text(file_name: str) -> str:
     year = meta.get('year')
     season = meta.get('season', '')
     quality = meta.get('quality', '')
-    language = meta.get('language', '')
+    language = meta.get('custom_audio', [])
     year_str = f" ({year})" if year else ""
     header = (
         f"🎬 **{title}{year_str}**\n"
         f"📁 **Season:** {season}\n"
         f"📺 **Quality:** {quality}\n"
-        f"🔊 **Language:** {language}"
+        f"🔊 **Language:** {", ".join(language)}"
     )
     return header
 
@@ -121,6 +126,7 @@ def generate_final_message(metadata: dict, batch_link:str) -> str:
     audio = ", ".join(metadata.get("custom_audio", []))
     sub = metadata.get("custom_subs", "[]")
     quality = metadata.get("quality", "720P").upper()
+    link_text = f"{quality} {audio}".strip()
     caption = (
         f"🎭 {title} • {year}\n"
         f"📁 SEASON - {season}\n"
@@ -128,7 +134,7 @@ def generate_final_message(metadata: dict, batch_link:str) -> str:
         f"💬 SUBTITLES {'👍' if len(sub) else '👎'}\n"
         f"\n"
         f"📦 QUALITY - || {quality} ||\n"
-        f"📦 {batch_link} ||\n"
+       f"🔗 **[{link_text}]({batch_link})**\n"
         f"\n"
         f"༄༅──────────────༅༄\n"
         f"@TIFDiscuss 🌹 @TIF_WebSeries"
