@@ -71,6 +71,22 @@ if ! "$PYTHON_BIN" -m venv --help >/dev/null 2>&1; then
   fi
 fi
 
+echo "Checking ffmpeg..."
+if ! command -v ffmpeg >/dev/null 2>&1; then
+  echo "ffmpeg not found. Installing..."
+  if command -v apt-get >/dev/null 2>&1; then
+    $SUDO apt-get update
+    $SUDO apt-get install -y ffmpeg
+  elif command -v brew >/dev/null 2>&1; then
+    brew install ffmpeg
+  elif command -v yum >/dev/null 2>&1; then
+    $SUDO yum install -y ffmpeg
+  else
+    echo "Could not install ffmpeg automatically. Please install it manually."
+    exit 1
+  fi
+fi
+
 echo "Creating virtual environment..."
 "$PYTHON_BIN" -m venv "$VENV_DIR"
 

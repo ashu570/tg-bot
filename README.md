@@ -133,3 +133,5 @@ If the app exits with a missing configuration error, verify the `.env` file cont
 ## License
 
 This project is currently unlicensed unless otherwise specified by the repository owner.
+
+## Todo: Give information about setup.sh (chmod +x ./setup.sh)

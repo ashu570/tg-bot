@@ -12,17 +12,21 @@ async def generate_season_cards(seasons_data: dict, chat_id: int):
     for season, qualities in sorted(seasons_data.items()):
         card_text = f"🎬 **{season}**\nSelect the quality and language tier you want to process:"
         keyboard = []
+        season_hashes = []
         for quality_key, episodes in qualities.items():
             short_hash = uuid.uuid4().hex[:6]
+            season_hashes.append(short_hash)
             ACTIVE_BATCHES[chat_id][short_hash] = list(episodes.values())
             ep_count = len(episodes)
             button_text = f"{quality_key} ({ep_count} EPs)"
             cb_data = f"p|{short_hash}".encode('utf-8')
             keyboard.append([Button.inline(button_text, data=cb_data)])
-        keyboard.append([
-            # Todo: Need to handle this efficiently
-            Button.inline("⏬ Process ALL Qualities & Audio", data=f"p|{season}|ALL".encode('utf-8'))
-        ])
+        
+        if season_hashes:
+            season_hash = uuid.uuid4().hex[:6]
+            ACTIVE_BATCHES[chat_id][season_hash] = "#".join(season_hashes)
+            keyboard.append([Button.inline("⏬ Process ALL Qualities & Audio", data=f"p|{season_hash}".encode('utf-8'))])
+
         sent_msg = await bot.send_message(chat_id, card_text, buttons=keyboard)
         ACTIVE_SEASON_CARDS[chat_id].append(sent_msg.id)
     # if len(seasons_data) > 1 or (len(seasons_data) == 1 and "Movie" not in seasons_data):

@@ -13,25 +13,22 @@ from src.helper.progress_tracker import ProgressTracker, ProcessCancelledError
 
 LINK_BOT_USERNAME = "@Links_X_Bot"
 
-async def bridge_to_link_bot(shadow_messages: list, reply_chat_id: int, batch_size: int, series_meta:dict, thumbnail = None):
-    # Todo: Implement a season + language based batching, after all the batching are done send message to ready
-    await bot.send_message(reply_chat_id, "🔗 **Stage 4: Bridging...**\nExecuting batch command with link generator...")
-    
+async def bridge_to_link_bot(shadow_messages: list, reply_chat_id: int, batch_size: int, batch_index: int, total_batches: int) -> str:
+    await bot.send_message(reply_chat_id, f"🔗 **Stage 4: Bridging (Batch {batch_index}/{total_batches})...**\nExecuting command with link generator...")
+    batch_link = None
     try:
-        async with userbot.conversation(LINK_BOT_USERNAME, timeout=30) as conv:
+        async with userbot.conversation(LINK_BOT_USERNAME, timeout=60) as conv:
             if batch_size == 1:
                 await conv.send_message("/genlink")
-                await asyncio.sleep(0.5) 
+                await conv.get_response(timeout=15) 
                 await userbot.forward_messages(LINK_BOT_USERNAME, shadow_messages[0])
             else:   
                 await conv.send_message("/batch")
-                await asyncio.sleep(0.5) 
+                await conv.get_response(timeout=15) 
                 await userbot.forward_messages(LINK_BOT_USERNAME, shadow_messages[0])
-                await asyncio.sleep(0.5)
+                await conv.get_response(timeout=15) 
                 await userbot.forward_messages(LINK_BOT_USERNAME, shadow_messages[-1])
-            batch_link = None
             timeout_counter = 0
-            
             while timeout_counter < 30:
                 history = await userbot.get_messages(LINK_BOT_USERNAME, limit=1)
                 if history:
@@ -47,8 +44,7 @@ async def bridge_to_link_bot(shadow_messages: list, reply_chat_id: int, batch_si
                 timeout_counter += 1
             if not batch_link:
                 raise asyncio.TimeoutError("The link was never found in the bot's messages.")
-        await bot.send_message(reply_chat_id, "📢 **Stage 5: Finalizing...**\nPublishing to Ready channel.")
-        final_caption = generate_final_message(series_meta, batch_link)
+        return batch_link
         # Todo: To be tested
         # target_entity = await userbot.get_input_entity(config.shadow_channel)
         # await bot.send_message(
@@ -56,15 +52,10 @@ async def bridge_to_link_bot(shadow_messages: list, reply_chat_id: int, batch_si
         #     final_caption,
         #     buttons=[Button.url("📥 Access Batch", batch_link)]
         # )
-        await userbot.send_message(
-            config.ready_channel,
-            final_caption,
-            file=thumbnail if thumbnail and os.path.exists(thumbnail) else None
-        )
 
     except asyncio.TimeoutError:
         logger.error("Timed out waiting for the final link from the bot.")
-        await bot.send_message(reply_chat_id, "❌ **Error:** The link generator bot did not provide a link within 15 seconds.")
+        await bot.send_message(reply_chat_id, "❌ **Error:** The link generator bot did not provide a link within 30 seconds.")
     except Exception as e:
         logger.exception(f"Error during bridging phase: {e}")
         await bot.send_message(reply_chat_id, f"❌ **Error during bridging:** `{e}`")
@@ -119,25 +110,25 @@ def generate_header_text(file_name: str) -> str:
     )
     return header
 
-def generate_final_message(metadata: dict, batch_link:str) -> str:
+def generate_final_message(metadata: dict, successful_links: dict) -> str:
     title = metadata.get("title", "UNKNOWN TITLE").upper()
     year = metadata.get("year", "")
     season = metadata.get("season", "1")
-    audio = ", ".join(metadata.get("custom_audio", []))
     sub = metadata.get("custom_subs", "[]")
-    quality = metadata.get("quality", "720P").upper()
-    link_text = f"{quality} {audio}".strip()
+    year_str = f" • {year}" if year else ""
     caption = (
-        f"🎭 {title} • {year}\n"
+        f"🎭 {title}{year_str}\n"
         f"📁 SEASON - {season}\n"
-        f"🎧 AUDIO - {audio}\n"
-        f"💬 SUBTITLES {'👍' if len(sub) else '👎'}\n"
+        f"💬 SUBTITLES - {'👍' if len(sub) > 0 and sub != '[]' else '👎'}\n"
         f"\n"
-        f"📦 QUALITY - || {quality} ||\n"
-       f"🔗 **[{link_text}]({batch_link})**\n"
+        f"📦 **AVAILABLE QUALITIES:**\n"
+    )
+    for quality_label, link in successful_links.items():
+        formatted_label = quality_label.strip().upper()
+        caption += f"🔗 **[{formatted_label}]({link})**\n"
+    caption += (
         f"\n"
         f"༄༅──────────────༅༄\n"
         f"@TIFDiscuss 🌹 @TIF_WebSeries"
     )
-    
     return caption
