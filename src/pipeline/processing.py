@@ -100,7 +100,7 @@ async def execute_single_batch(messages, batch_index, total_batches, reply_chat_
             if shadow_msg:
                 shadow_messages.append(shadow_msg)       
         except ProcessCancelledError:
-            logger.info(f"Pipeline cancelation requested while excuting batch-{batch_index+1} .... Exiting")
+            logger.info(f"Pipeline cancelation requested while excuting batch-{batch_index} .... Exiting")
             if shadow_header and len(shadow_messages) == 0:
                 try:
                     await shadow_header.delete()

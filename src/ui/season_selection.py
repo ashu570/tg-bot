@@ -4,13 +4,15 @@ from src.libs.user_client import bot
 from src.libs.logger import logger
 from src.helper.commons import ACTIVE_BATCHES, ACTIVE_SEASON_CARDS 
 
-async def generate_season_cards(seasons_data: dict, chat_id: int):
+async def generate_season_cards(seasons_data: dict, chat_id: int, current_index: int = 1, total_queries: int = 1, search_query: str = ""):
     if not seasons_data:
         return
-    ACTIVE_BATCHES[chat_id] = {}
-    ACTIVE_SEASON_CARDS[chat_id] = []
+    if chat_id not in ACTIVE_BATCHES:
+        ACTIVE_BATCHES[chat_id] = {}
+    if chat_id not in ACTIVE_SEASON_CARDS:
+        ACTIVE_SEASON_CARDS[chat_id] = []
     for season, qualities in sorted(seasons_data.items()):
-        card_text = f"🎬 **{season}**\nSelect the quality and language tier you want to process:"
+        card_text = f"📦 **[{current_index}/{total_queries}] Query:** `{search_query}`\n🎬 **{season}**\nSelect the quality and language tier you want to process:"
         keyboard = []
         season_hashes = []
         for quality_key, episodes in qualities.items():

@@ -5,8 +5,8 @@ from src.pipeline.processing import process_files
 from src.plugin.indexer import db
 from src.helper.season_extractor import segregate_and_dedupe
 from src.ui.season_selection import generate_season_cards
-from src.helper.commons import ACTIVE_BATCHES
 import re
+import asyncio
 
 def build_smart_regex(search_text: str) -> re.Pattern:
     if not search_text or not search_text.strip():
@@ -23,10 +23,9 @@ def build_smart_regex(search_text: str) -> re.Pattern:
     regex_string = delimiter_bridge.join(escaped_words)
     return re.compile(regex_string, re.IGNORECASE)
 
-async def ingest_raw_files(reply_chat_id: int, search_query: str):
+async def ingest_raw_files(reply_chat_id: int, search_query: str, current_index: int = 1, total_queries: int = 1):
     logger.info(f"Starting precise local scan on RAW channel for: '{search_query}'")
     matched_messages = []
-    ACTIVE_BATCHES.clear()
     matcher = build_smart_regex(search_query)
     try:
         all_records = db.fetch_all_records()
@@ -61,19 +60,24 @@ async def ingest_raw_files(reply_chat_id: int, search_query: str):
             #Todo: Add a bot message for duplicate entries
             seasons_data = segregate_and_dedupe(matched_messages)
             if not seasons_data:
-                await bot.send_message(reply_chat_id, "⚠️ Found files, but could not parse valid Season/Episode metadata.")
+                await bot.send_message(reply_chat_id, f"⚠️ Found files for `{search_query}`, but could not parse metadata")
+                from src.handlers.commands import advance_session # Local import to prevent circular loop
+                asyncio.create_task(advance_session(reply_chat_id))
                 return
-
             await bot.send_message(
                 reply_chat_id, 
                 f"✅ Found **{len(matched_messages)}** files.\n Assembling files to relevant seasons"            )
-            await generate_season_cards(seasons_data, reply_chat_id)
+            await generate_season_cards(seasons_data, reply_chat_id,current_index, total_queries, search_query)
         else:
             await bot.send_message(
                 reply_chat_id, 
                 f"No files matching `{search_query}` were found in the channel history."
             )
+            from src.handlers.commands import advance_session
+            asyncio.create_task(advance_session(reply_chat_id))
 
     except Exception as e:
         logger.error(f"Error during optimized ingestion execution: {e}")
         await bot.send_message(reply_chat_id, f"❌ **Error during ingestion:** `{e}`")
+        from src.handlers.commands import advance_session
+        asyncio.create_task(advance_session(reply_chat_id))

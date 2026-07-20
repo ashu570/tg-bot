@@ -70,6 +70,7 @@ common_helper = CommonHelper()
 ACTIVE_BATCHES = {}
 CANCELLED_EVENTS = {}
 ACTIVE_SEASON_CARDS={}
+USER_SESSIONS = {}
 language_map = {
     'e': 'English',
     'eng': 'English',
