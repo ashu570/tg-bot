@@ -66,7 +66,7 @@ async def ingest_raw_files(reply_chat_id: int, search_query: str, current_index:
                 return
             await bot.send_message(
                 reply_chat_id, 
-                f"✅ Found **{len(matched_messages)}** files.\n Assembling files to relevant seasons. \n {duplicate_count+" duplicates found" if duplicate_count else ""}")
+                f"✅ Found **{len(matched_messages)}** files.\n Assembling files to relevant seasons. \n {f"{duplicate_count} duplicates found" if duplicate_count else ""}")
             await generate_season_cards(seasons_data, reply_chat_id,current_index, total_queries, search_query)
         else:
             await bot.send_message(
