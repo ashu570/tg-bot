@@ -2,7 +2,7 @@ import os
 import asyncio
 from src.libs.logger import logger
 from src.libs.user_client import bot
-from src.pipeline.publish import publish_and_cleanup,generate_header_text, bridge_to_link_bot, generate_final_message
+from src.pipeline.publish import publish_and_cleanup,generate_header_text, bridge_to_link_bot, generate_final_message, generate_native_link
 from src.helper.commons import ACTIVE_BATCHES, common_helper, CANCELLED_EVENTS
 from src.helper.file_formator import format_video_metadata
 from src.helper.progress_tracker import ProgressTracker, ProcessCancelledError
@@ -137,7 +137,7 @@ async def process_files(batches: list, reply_chat_id: int):
             messages, batch_index, len(batches), reply_chat_id, status_msg, shadow_thumb_path, header_text
         )  
         if not is_cancelled and shadow_messages:
-            batch_link = await bridge_to_link_bot(shadow_messages, reply_chat_id, len(shadow_messages), batch_index, len(batches))
+            batch_link = await generate_native_link(shadow_messages, reply_chat_id, len(shadow_messages), batch_index, len(batches))
             if batch_link:
                 successful_links[quality_key] = batch_link
     CANCELLED_EVENTS.pop(reply_chat_id, None)

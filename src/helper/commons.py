@@ -2,6 +2,7 @@ import re
 import os
 import aiohttp
 import shutil
+import base64
 from guessit import guessit
 from typing import Optional, Any
 from src.libs.logger import logger
@@ -65,6 +66,18 @@ class CommonHelper:
         if os.path.exists(dir_path):
             shutil.rmtree(dir_path)
         os.makedirs(dir_path, exist_ok=True)
+
+    def encode_payload(self, string: str) -> str:
+        string_bytes = string.encode("ascii")
+        base64_bytes = base64.urlsafe_b64encode(string_bytes)
+        base64_string = (base64_bytes.decode("ascii")).strip("=")
+        return base64_string
+
+    def decode_payload(self, base64_string: str) -> str:
+        base64_string = base64_string.strip("=")
+        base64_bytes = (base64_string + "=" * (-len(base64_string) % 4)).encode("ascii")
+        string_bytes = base64.urlsafe_b64decode(base64_bytes) 
+        return string_bytes.decode("ascii")
     
 common_helper = CommonHelper()
 ACTIVE_BATCHES = {}

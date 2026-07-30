@@ -4,7 +4,7 @@ from config import config
 from src.pipeline.processing import process_files 
 from src.plugin.indexer import db
 from src.helper.season_extractor import segregate_and_dedupe
-from src.ui.season_selection import generate_season_cards
+from src.ui.season_selection import generate_season_cards                                            
 import re
 import asyncio
 
@@ -58,7 +58,7 @@ async def ingest_raw_files(reply_chat_id: int, search_query: str, current_index:
         
         if matched_messages:
             #Todo: Add a bot message for duplicate entries
-            seasons_data = segregate_and_dedupe(matched_messages)
+            seasons_data, duplicate_count = segregate_and_dedupe(matched_messages)
             if not seasons_data:
                 await bot.send_message(reply_chat_id, f"⚠️ Found files for `{search_query}`, but could not parse metadata")
                 from src.handlers.commands import advance_session # Local import to prevent circular loop
@@ -66,7 +66,7 @@ async def ingest_raw_files(reply_chat_id: int, search_query: str, current_index:
                 return
             await bot.send_message(
                 reply_chat_id, 
-                f"✅ Found **{len(matched_messages)}** files.\n Assembling files to relevant seasons"            )
+                f"✅ Found **{len(matched_messages)}** files.\n Assembling files to relevant seasons. \n {duplicate_count+" duplicates found" if duplicate_count else ""}")
             await generate_season_cards(seasons_data, reply_chat_id,current_index, total_queries, search_query)
         else:
             await bot.send_message(

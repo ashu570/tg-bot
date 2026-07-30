@@ -23,6 +23,7 @@ def segregate_and_dedupe(messages: list[Message]) -> dict:
     """
     Organizes messages into a nested dictionary:
     """
+    duplicate_count = 0
     seasons_data = defaultdict(lambda: defaultdict(dict))
     for msg in messages:
         file_name = ""
@@ -37,8 +38,9 @@ def segregate_and_dedupe(messages: list[Message]) -> dict:
             continue 
         quality_lang_key = f"{quality} {language}".strip()
         if episode in seasons_data[f"{title} {season}".strip().title()][quality_lang_key]:
+           duplicate_count+=1
            pass
         else:
             seasons_data[f"{title} {season}".strip().title()][quality_lang_key][episode] = msg
 
-    return seasons_data
+    return seasons_data, duplicate_count

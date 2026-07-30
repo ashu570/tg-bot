@@ -1,10 +1,12 @@
 import asyncio
 from telethon import events
+from telethon.errors import FloodWaitError
 from src.libs.logger import logger
 from src.libs.user_client import bot
 from src.pipeline.ingestion import ingest_raw_files 
-from src.helper.commons import ACTIVE_BATCHES, CANCELLED_EVENTS, ACTIVE_SEASON_CARDS, USER_SESSIONS
+from src.helper.commons import ACTIVE_BATCHES, CANCELLED_EVENTS, ACTIVE_SEASON_CARDS, USER_SESSIONS, common_helper
 from src.pipeline.processing import handle_series_selection
+from config import config
 
 @bot.on(events.NewMessage(pattern=r'^/process (.+)$', incoming=True))
 async def trigger_processing(event):
@@ -78,3 +80,49 @@ async def handle_cancel_processing(event):
         await event.answer("Stopping process safely... Please wait.", alert=True)
     else:
         await event.answer("No active process to cancel.", alert=True)
+
+@bot.on(events.NewMessage(pattern=r'^/start(?: |$)(.*)', incoming=True))
+async def handle_start_command(event):
+    if not event.is_private:
+        return
+    payload = event.pattern_match.group(1).strip()
+    if not payload:
+        await event.respond("👋 Hello! I am the orchestrator bot. Send me a `/process <query>` command to begin.")
+        return
+    try:
+        decoded_string = common_helper.decode_payload(payload)
+        args = decoded_string.split("-")
+        if args[0] != "get":
+            return
+        channel_id_abs = abs(config.shadow_channel)
+        if len(args) == 3:
+            start_msg = int(int(args[1]) / channel_id_abs)
+            end_msg = int(int(args[2]) / channel_id_abs)
+            message_ids = list(range(start_msg, end_msg + 1))
+        elif len(args) == 2:
+            message_ids = [int(int(args[1]) / channel_id_abs)]
+        else:
+            return
+    except Exception as e:
+        logger.error(f"Invalid deep link payload '{payload}': {e}")
+        await event.respond("⚠️ **Invalid or expired link.**")
+        return
+    temp_msg = await event.respond("⏳ **Fetching your files, please wait...**")
+    try:
+        messages = await bot.get_messages(config.shadow_channel, ids=message_ids)
+        messages = [msg for msg in messages if msg is not None]
+        if not messages:
+            await temp_msg.edit("❌ **Files not found.** They might have been removed from the server.")
+            return
+        await temp_msg.delete()
+        for msg in messages:
+            try:
+                await bot.send_message(event.chat_id, message=msg)
+                await asyncio.sleep(0.5)
+            except FloodWaitError as e:
+                logger.warning(f"FloodWait during delivery, sleeping for {e.seconds}s")
+                await asyncio.sleep(e.seconds)
+                await bot.send_message(event.chat_id, message=msg)
+    except Exception as e:
+        logger.exception(f"Error fetching shadow channel files: {e}")
+        await event.respond("❌ **Something went wrong while fetching the files.**")

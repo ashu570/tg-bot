@@ -6,7 +6,7 @@ from src.libs.user_client import bot, userbot
 from config import config
 from telethon import Button
 from src.helper.file_formator import format_video_metadata
-from src.helper.commons import common_helper
+from src.helper.commons import common_helper 
 from telethon.errors import FloodWaitError
 from telethon.tl.types import DocumentAttributeVideo
 from src.helper.progress_tracker import ProgressTracker, ProcessCancelledError
@@ -59,6 +59,33 @@ async def bridge_to_link_bot(shadow_messages: list, reply_chat_id: int, batch_si
     except Exception as e:
         logger.exception(f"Error during bridging phase: {e}")
         await bot.send_message(reply_chat_id, f"❌ **Error during bridging:** `{e}`")
+
+async def generate_native_link(shadow_messages: list, reply_chat_id: int, batch_size: int, batch_index: int, total_batches: int) -> str:
+    await bot.send_message(
+        reply_chat_id, 
+        f"🔗 **Stage 4: Generating Link (Batch {batch_index}/{total_batches})...**"
+    )
+    try:
+        if not shadow_messages:
+            raise ValueError("No messages provided to generate a link.")
+        bot_info = await bot.get_me()
+        bot_username = bot_info.username
+        channel_id_abs = abs(config.shadow_channel)
+        if len(shadow_messages) == 1:
+            msg_id = shadow_messages[0].id
+            payload_string = f"get-{msg_id * channel_id_abs}"
+        else:
+            first_msg_id = shadow_messages[0].id
+            last_msg_id = shadow_messages[-1].id
+            payload_string = f"get-{first_msg_id * channel_id_abs}-{last_msg_id * channel_id_abs}"
+        base64_payload = common_helper.encode_payload(payload_string)
+        batch_link = f"https://t.me/{bot_username}?start={base64_payload}"
+        return batch_link
+
+    except Exception as e:
+        logger.exception(f"Error generating native link: {e}")
+        await bot.send_message(reply_chat_id, f"❌ **Error during link generation:** `{e}`")
+        return None
 
 async def publish_and_cleanup(asset: dict, tracker):
     success = False
