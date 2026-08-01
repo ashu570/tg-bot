@@ -80,7 +80,7 @@ async def execute_single_batch(messages, batch_index, total_batches, reply_chat_
         new_filename, final_caption = format_video_metadata(raw_name)
         custom_file_path = os.path.join(DOWNLOAD_DIR, new_filename if new_filename else '')
         try:
-            tracker = ProgressTracker(status_msg, index, total_batches, total_messages, reply_chat_id,season_name, "Download")
+            tracker = ProgressTracker(status_msg, batch_index, total_batches, total_messages, reply_chat_id,season_name, "Download")
             original_file_path = await msg.download_media(file=custom_file_path, progress_callback=tracker)   
             if not original_file_path:
                 logger.error(f"Failed to download {new_filename}")
@@ -92,7 +92,7 @@ async def execute_single_batch(messages, batch_index, total_batches, reply_chat_
                 except FloodWaitError as e:
                     await asyncio.sleep(e.seconds)
                     shadow_header = await userbot.send_message(config.shadow_channel, message=header_text)   
-            tracker = ProgressTracker(status_msg, index, total_batches, total_messages, reply_chat_id,season_name, "Upload")
+            tracker = ProgressTracker(status_msg, batch_index, total_batches, total_messages, reply_chat_id,season_name, "Upload")
             shadow_msg = await publish_and_cleanup(asset, tracker)
             if shadow_msg:
                 shadow_messages.append(shadow_msg)       
@@ -112,7 +112,13 @@ async def execute_single_batch(messages, batch_index, total_batches, reply_chat_
             if os.path.exists(custom_file_path):
                 os.remove(custom_file_path)  
     if shadow_messages:
-        await userbot.send_message(config.shadow_channel, file="CAACAgUAAxkBAAFQxV9qbmHQMCLzVzU86ytgWzfg9Th42QACoAADiD48MC_yVy7Rn2uMPQQ") 
+        try:
+            sticker_path = os.path.join(ASSETS_DIR, "shadow_sticker.webp")
+            if os.path.exists(sticker_path):
+                await userbot.send_message(config.shadow_channel, file=sticker_path)
+        except Exception as e:
+            logger.warning(f"Failed to send shadow token to shadow_channel: {e}")
+        
     return shadow_messages, is_cancelled
 
 async def process_files(batches: list, reply_chat_id: int):
