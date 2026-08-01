@@ -12,43 +12,53 @@ from config import config
 async def trigger_processing(event):
     if not event.is_private:
         return
-    raw_queries = event.pattern_match.group(1).strip()
-    if not raw_queries:
-        await event.respond("⚠️ Please provide a search term. Example: `/process file 1, file 2`")
-        return
-    queries = [q.strip() for q in raw_queries.split(',') if q.strip()]
     chat_id = event.chat_id
+    session = USER_SESSIONS.get(chat_id)
+    if session and session.get('queued_payloads') is not None and  session.get('queued_payloads'):
+        await event.respond("⚠️ A process is already running! Please wait for it to finish before starting a new one.")
+        return
+    raw_queries = event.pattern_match.group(1).strip()
+    queries = [q.strip() for q in raw_queries.split(',') if q.strip()]
     ACTIVE_BATCHES.pop(chat_id, None)
-    USER_SESSIONS[chat_id] = {
-        'pending_queries': queries,
-        'queued_payloads': [],
-        'total_queries': len(queries),
-        'current_index': 1
-    }
     await event.respond(f"🔍 Starting batch process for **{len(queries)}** queries...")
-    asyncio.create_task(advance_session(chat_id))
+    USER_SESSIONS[chat_id] = {
+            'pending_queries': queries,
+            'queued_payloads': [],
+            'total_queries': len(queries),
+            'current_index': 1
+    }
+    task = asyncio.create_task(advance_session(chat_id))
+    USER_SESSIONS[chat_id]['task'] = task
 
 async def advance_session(chat_id):
     session = USER_SESSIONS.get(chat_id)
     if not session:
         return
-    if session['pending_queries']:
-        next_query = session['pending_queries'].pop(0)
-        logger.info(f"Session {chat_id}: Advancing to next query -> {next_query}")
-        await ingest_raw_files(chat_id, next_query, session['current_index'], session['total_queries'])
-    else:
-        payloads = session['queued_payloads']
+    try:
+        if session['pending_queries']:
+            next_query = session['pending_queries'].pop(0)
+            logger.info(f"Session {chat_id}: Advancing to next query -> {next_query}")
+            await ingest_raw_files(chat_id, next_query, session['current_index'], session['total_queries'])
+        else:
+            payloads = session['queued_payloads']
+            if not payloads:
+                await bot.send_message(chat_id, "⚠️ Queue is empty. No selections were made.")
+                USER_SESSIONS.pop(chat_id, None)
+                return
+            task = asyncio.create_task(execute_queue(chat_id, payloads))
+            session['task'] = task
+    except Exception as e:
+        logger.error(f"❌ Error in advance_session for {chat_id}: {e}")
         USER_SESSIONS.pop(chat_id, None)
-        if not payloads:
-            await bot.send_message(chat_id, "⚠️ Queue is empty. No selections were made.")
-            return
-        await bot.send_message(chat_id, f"✅ All queries parsed! Starting execution of **{len(payloads)}** items...")
-        asyncio.create_task(execute_queue(chat_id, payloads))
 
 async def execute_queue(chat_id, payloads):
-    for target_hash in payloads:
-        await handle_series_selection(chat_id, target_hash)
-    await bot.send_message(chat_id, "🎉 Batch processing fully complete!")
+    try:
+        for target_hash in payloads:
+            await handle_series_selection(chat_id, target_hash)
+        await bot.send_message(chat_id, "🎉 Batch processing fully complete!")
+    finally:
+        USER_SESSIONS.pop(chat_id, None)
+    
 
 @bot.on(events.CallbackQuery(pattern=rb'^p\|'))
 async def handle_season_processing(event):
@@ -87,7 +97,7 @@ async def handle_start_command(event):
         return
     payload = event.pattern_match.group(1).strip()
     if not payload:
-        await event.respond("👋 Hello! I am the orchestrator bot. Send me a `/process <query>` command to begin.")
+        await event.respond("👋 Hello! I am the orchestrator bot. Send me a command to begin.")
         return
     try:
         decoded_string = common_helper.decode_payload(payload)
@@ -120,9 +130,23 @@ async def handle_start_command(event):
                 await bot.send_message(event.chat_id, message=msg)
                 await asyncio.sleep(0.5)
             except FloodWaitError as e:
-                logger.warning(f"FloodWait during delivery, sleeping for {e.seconds}s")
+                logger.warning(f"FloodWait while fetching files, sleeping for {e.seconds}s")
                 await asyncio.sleep(e.seconds)
                 await bot.send_message(event.chat_id, message=msg)
     except Exception as e:
         logger.exception(f"Error fetching shadow channel files: {e}")
         await event.respond("❌ **Something went wrong while fetching the files.**")
+
+@bot.on(events.NewMessage(pattern=r'^/reset$', incoming=True))
+async def reset_user_session(event):
+    if not event.is_private:
+        return
+    chat_id = event.chat_id
+    if chat_id in USER_SESSIONS:
+        session = USER_SESSIONS[chat_id]
+        if 'task' in session and not session['task'].done():
+            session['task'].cancel()
+        USER_SESSIONS.pop(chat_id, None)
+        await event.respond("✅ **Session forcefully reset.** You can now start a new `/process`.")
+    else:
+        await event.respond("ℹ️ You don't have any active processes running.")

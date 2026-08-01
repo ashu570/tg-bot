@@ -10,6 +10,7 @@ from config import config
 import cryptg
 from telethon.errors import FloodWaitError
 from src.libs.user_client import bot, userbot
+import re
 
 ASSETS_DIR = 'assets'
 DOWNLOAD_DIR = "downloads"
@@ -28,23 +29,19 @@ async def fetch_meta_from_tmdb (query:str):
     if not data or not data.get("results"):
         return None
     result = data.get("results")
-    best_match = result[0]
-
-    #Todo: Review advanced filtering
-    # best_match = None
-    # max_overlap = -1 
-    # target_words = set(re.findall(r'\w+', query.lower()))
-    # for result in data["results"]:
-    #     tmdb_title = result.get("title") or result.get("name", "")
-    #     title_words = set(re.findall(r'\w+', tmdb_title.lower()))
-    #     overlap = len(target_words.intersection(title_words))
-        
-    #     if overlap > max_overlap:
-    #         max_overlap = overlap
-    #         best_match = result
-    #     elif overlap == max_overlap and overlap >= 0:
-    #         if result.get("popularity", 0.0) > best_match.get("popularity", 0.0):
-    #             best_match = result
+    best_match = None
+    max_overlap = -1 
+    target_words = set(re.findall(r'\w+', query.lower()))
+    for result in data["results"]:
+        tmdb_title = result.get("title") or result.get("name", "")
+        title_words = set(re.findall(r'\w+', tmdb_title.lower()))
+        overlap = len(target_words.intersection(title_words)) 
+        if overlap > max_overlap:
+            max_overlap = overlap
+            best_match = result
+        elif overlap == max_overlap and overlap >= 0:
+            if result.get("popularity", 0.0) > best_match.get("popularity", 0.0):
+                best_match = result
     
     if best_match:
         poster_path = best_match.get("poster_path")
@@ -72,7 +69,7 @@ async def prepare_series_metadata(first_msg):
             
     return first_file_name, final_thumb_path, shadow_thumb_path
 
-async def execute_single_batch(messages, batch_index, total_batches, reply_chat_id, status_msg, shadow_thumb_path, header_text):
+async def execute_single_batch(messages, batch_index, total_batches, reply_chat_id, status_msg, shadow_thumb_path, header_text, season_name):
     total_messages = len(messages)
     shadow_messages = []
     shadow_header = None
@@ -83,7 +80,7 @@ async def execute_single_batch(messages, batch_index, total_batches, reply_chat_
         new_filename, final_caption = format_video_metadata(raw_name)
         custom_file_path = os.path.join(DOWNLOAD_DIR, new_filename if new_filename else '')
         try:
-            tracker = ProgressTracker(status_msg, index, total_messages, reply_chat_id, "Download")
+            tracker = ProgressTracker(status_msg, index, total_batches, total_messages, reply_chat_id,season_name, "Download")
             original_file_path = await msg.download_media(file=custom_file_path, progress_callback=tracker)   
             if not original_file_path:
                 logger.error(f"Failed to download {new_filename}")
@@ -95,7 +92,7 @@ async def execute_single_batch(messages, batch_index, total_batches, reply_chat_
                 except FloodWaitError as e:
                     await asyncio.sleep(e.seconds)
                     shadow_header = await userbot.send_message(config.shadow_channel, message=header_text)   
-            tracker = ProgressTracker(status_msg, index, total_messages, reply_chat_id, "Upload")
+            tracker = ProgressTracker(status_msg, index, total_batches, total_messages, reply_chat_id,season_name, "Upload")
             shadow_msg = await publish_and_cleanup(asset, tracker)
             if shadow_msg:
                 shadow_messages.append(shadow_msg)       
@@ -113,7 +110,9 @@ async def execute_single_batch(messages, batch_index, total_batches, reply_chat_
             logger.error(f"Unexpected error processing {new_filename} for chat_id {reply_chat_id}: {e}", exc_info=True)
         finally:
             if os.path.exists(custom_file_path):
-                os.remove(custom_file_path)   
+                os.remove(custom_file_path)  
+    if shadow_messages:
+        await userbot.send_message(config.shadow_channel, file="CAACAgUAAxkBAAFQxV9qbmHQMCLzVzU86ytgWzfg9Th42QACoAADiD48MC_yVy7Rn2uMPQQ") 
     return shadow_messages, is_cancelled
 
 async def process_files(batches: list, reply_chat_id: int):
@@ -122,7 +121,9 @@ async def process_files(batches: list, reply_chat_id: int):
     CANCELLED_EVENTS[reply_chat_id] = asyncio.Event()
     first_msg = batches[0][0]
     first_file_name, final_thumb_path, shadow_thumb_path = await prepare_series_metadata(first_msg)
-    status_msg = await bot.send_message(reply_chat_id, f"⏳ Processing {len(batches)} Batch(es)...")
+    series_meta = common_helper.file_meta_extractor(first_file_name)
+    season_name =  f"{series_meta.get("title")} S{series_meta.get("season")}"
+    status_msg = await bot.send_message(reply_chat_id, f"⏳ Processing {len(batches)} batches for {season_name}...")
     successful_links = {}
     is_cancelled = False
     for batch_index, messages in enumerate(batches, start=1):
@@ -134,7 +135,7 @@ async def process_files(batches: list, reply_chat_id: int):
         quality_key = f"{batch_meta.get('quality', 'Unknown')}-{', '.join(batch_meta.get('custom_audio', []))}".strip()
         header_text = generate_header_text(format_video_metadata(batch_first_file)[1])
         shadow_messages, is_cancelled = await execute_single_batch(
-            messages, batch_index, len(batches), reply_chat_id, status_msg, shadow_thumb_path, header_text
+            messages, batch_index, len(batches), reply_chat_id, status_msg, shadow_thumb_path, header_text, season_name
         )  
         if not is_cancelled and shadow_messages:
             batch_link = await generate_native_link(shadow_messages, reply_chat_id, len(shadow_messages), batch_index, len(batches))
@@ -142,9 +143,9 @@ async def process_files(batches: list, reply_chat_id: int):
                 successful_links[quality_key] = batch_link
     CANCELLED_EVENTS.pop(reply_chat_id, None)
     if is_cancelled:
-        await status_msg.edit("🛑 **Process Cancelled.**")
+        await status_msg.edit(f"🛑** [{season_name}] Process Cancelled.**")
     elif successful_links:
-        series_meta = common_helper.file_meta_extractor(first_file_name)
+        await status_msg.edit(f"✅** [{season_name}] Processed Successfully.**")
         final_caption = generate_final_message(series_meta, successful_links)
         await userbot.send_message(
             config.ready_channel, final_caption, 
@@ -161,17 +162,17 @@ async def handle_series_selection(chat_id: int, target_hash: str):
     if chat_id not in ACTIVE_BATCHES or target_hash not in ACTIVE_BATCHES[chat_id]:
         logger.error(f"Session expired or data not found for chat {chat_id}.")
         return
-    stored_value = ACTIVE_BATCHES[chat_id][target_hash]
+    target_key = ACTIVE_BATCHES[chat_id][target_hash]
     batches_to_process = []
-    if isinstance(stored_value, str):
-        child_hashes = stored_value.split("#")
+    if isinstance(target_key, str):
+        child_hashes = target_key.split("#")
         for c_hash in child_hashes:
             if c_hash in ACTIVE_BATCHES[chat_id]:
                 episode_list = ACTIVE_BATCHES[chat_id][c_hash]
                 if episode_list:
                     batches_to_process.append(episode_list)
-    elif isinstance(stored_value, list):
-        batches_to_process.append(stored_value)
+    elif isinstance(target_key, list):
+        batches_to_process.append(target_key)
     try:
         await process_files(batches_to_process, chat_id)
     except Exception as e:

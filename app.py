@@ -11,7 +11,7 @@ async def main():
     logger.info("Booting up Orchestrator Bot and Userbot...")
     await bot.start(bot_token=config.bot_token)
     await userbot.start()
-    logger.info("✅ Ecosystem is live! src/ module layout loaded.")
+    logger.info("✅ Ecosystem is live!")
     await asyncio.gather(
         bot.run_until_disconnected(),
         userbot.run_until_disconnected()

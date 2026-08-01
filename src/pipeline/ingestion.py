@@ -24,13 +24,12 @@ def build_smart_regex(search_text: str) -> re.Pattern:
     return re.compile(regex_string, re.IGNORECASE)
 
 async def ingest_raw_files(reply_chat_id: int, search_query: str, current_index: int = 1, total_queries: int = 1):
-    logger.info(f"Starting precise local scan on RAW channel for: '{search_query}'")
+    logger.info(f"Searching in RAW channel for: '{search_query}'")
     matched_messages = []
     matcher = build_smart_regex(search_query)
     try:
         all_records = db.fetch_all_records()
         matched_db_ids = []
-        # Todo: Improve match logic to include the whole search query (If the query is Iron man, it should match only Iron man files not Iron Fist)
         for msg_id, file_name, caption in all_records:
             if (file_name and matcher.search(file_name)) or (caption and matcher.search(caption)):
                 matched_db_ids.append(msg_id)
@@ -64,9 +63,10 @@ async def ingest_raw_files(reply_chat_id: int, search_query: str, current_index:
                 from src.handlers.commands import advance_session # Local import to prevent circular loop
                 asyncio.create_task(advance_session(reply_chat_id))
                 return
+            duplicate_message = f"{duplicate_count} duplicates found" if duplicate_count else ""
             await bot.send_message(
                 reply_chat_id, 
-                f"✅ Found **{len(matched_messages)}** files.\n Assembling files to relevant seasons. \n {f"{duplicate_count} duplicates found" if duplicate_count else ""}")
+                f"✅ Found **{len(matched_messages)}** files matching `{search_query}`. \n {duplicate_message}")
             await generate_season_cards(seasons_data, reply_chat_id,current_index, total_queries, search_query)
         else:
             await bot.send_message(

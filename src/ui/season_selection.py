@@ -12,7 +12,7 @@ async def generate_season_cards(seasons_data: dict, chat_id: int, current_index:
     if chat_id not in ACTIVE_SEASON_CARDS:
         ACTIVE_SEASON_CARDS[chat_id] = []
     for season, qualities in sorted(seasons_data.items()):
-        card_text = f"📦 **[{current_index}/{total_queries}] Query:** `{search_query}`\n🎬 **{season}**\nSelect the quality and language tier you want to process:"
+        card_text = f"📦 **[Batch: {current_index}/{total_queries}] Query:** `{search_query}`\n🎬 **{season}**\nSelect the quality and language tier you want to process:"
         keyboard = []
         season_hashes = []
         for quality_key, episodes in qualities.items():
@@ -30,12 +30,5 @@ async def generate_season_cards(seasons_data: dict, chat_id: int, current_index:
             keyboard.append([Button.inline("⏬ Process ALL Qualities & Audio", data=f"p|{season_hash}".encode('utf-8'))])
 
         sent_msg = await bot.send_message(chat_id, card_text, buttons=keyboard)
-        ACTIVE_SEASON_CARDS[chat_id].append(sent_msg.id)
-    # if len(seasons_data) > 1 or (len(seasons_data) == 1 and "Movie" not in seasons_data):
-    #     final_text = "📦 **Series Processing**\nDo you want to process everything across all seasons?"
-    #     final_keyboard = [
-    #         [Button.inline("🚀 Process Entire Series", data=b"p_all_series")]
-    #     ]
-    #     await bot.send_message(chat_id, final_text, buttons=final_keyboard)
-        
+        ACTIVE_SEASON_CARDS[chat_id].append(sent_msg.id)        
     logger.info("Successfully generated and sent UI selection cards.")
