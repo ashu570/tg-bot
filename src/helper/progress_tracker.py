@@ -11,7 +11,7 @@ class ProcessCancelledError(Exception):
 
 class ProgressTracker:
     #Todo: Convert this class so that we can have multiple types of progress tracker
-    def __init__(self, status_message, file_index,total_batches, total_files, chat_id, season_name, type:str = 'Download'): #Default argument follows non-default argument
+    def __init__(self, status_message,file_index, batch_index,total_batches, total_files, chat_id, season_name, type:str = 'Download'): #Default argument follows non-default argument
         self.status_message = status_message
         self.file_index = file_index
         self.total_files = total_files
@@ -21,6 +21,7 @@ class ProgressTracker:
         self.chat_id = chat_id
         self.season_name = season_name
         self.total_batches = total_batches
+        self.batch_index = batch_index
     async def __call__(self, current, total):
         cancel_event = CANCELLED_EVENTS.get(self.chat_id)
         if cancel_event and cancel_event.is_set():
@@ -44,7 +45,7 @@ class ProgressTracker:
         speed_mb = speed / (1024 * 1024)
         
         text = (
-            f"🎬 **{self.season_name}** [Batch: {self.file_index}/{self.total_batches}]\n"
+            f"🎬 **{self.season_name}** [Batch: {self.batch_index}/{self.total_batches}]\n"
             f"⏳ **{self.type}ing File {self.file_index} of {self.total_files}**\n"
             f"📊 **Progress:** {percent:.1f}% ({current_mb:.1f} MB / {total_mb:.1f} MB)\n"
             f"🚀 **Speed:** {speed_mb:.2f} MB/s\n"
