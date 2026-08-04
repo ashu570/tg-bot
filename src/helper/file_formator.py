@@ -38,12 +38,11 @@ def format_video_metadata(original_name: str) -> tuple:
     caption_year_part = f"({year_tag})\n" if year_tag else "\n"
     caption_parts = [f"{title}{caption_year_part}"]
     if se_tag:
-        se_tag.replace("#",'')
-        caption_parts.append(se_tag)
+        caption_parts.append(f"**{se_tag.replace("#",'')}**")
     if quality_tag:
-        caption_parts.append(quality_tag)
+        caption_parts.append(f"**{quality_tag}")
     if lang_tag:
-        caption_parts.append(f"({lang_tag.replace('.', ' ')})")    
+        caption_parts.append(f"**({lang_tag.replace('.', ' ')})**")    
     final_caption = " ".join(caption_parts)
     
     return final_name, final_caption

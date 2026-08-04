@@ -11,6 +11,7 @@ import cryptg
 from telethon.errors import FloodWaitError
 from src.libs.user_client import bot, userbot
 import re
+from src.ui.shadow_messages import send_join_link
 
 ASSETS_DIR = 'assets'
 DOWNLOAD_DIR = "downloads"
@@ -78,6 +79,11 @@ async def execute_single_batch(messages, batch_index, total_batches, reply_chat_
     for index, msg in enumerate(messages, start=1):
         raw_name = msg.file.name if msg.file else msg.text
         new_filename, final_caption = format_video_metadata(raw_name)
+        caption_addon = (
+            f"\n"
+            f"**༄༅──────────────༅༄\n**"
+            f"@TIFDiscuss 🌹 @TIF_WebSeries"
+        )
         custom_file_path = os.path.join(DOWNLOAD_DIR, new_filename if new_filename else '')
         try:
             tracker = ProgressTracker(status_msg, index, batch_index, total_batches, total_messages, reply_chat_id,season_name, "Download")
@@ -85,7 +91,7 @@ async def execute_single_batch(messages, batch_index, total_batches, reply_chat_
             if not original_file_path:
                 logger.error(f"Failed to download {new_filename}")
                 continue
-            asset = {"video": custom_file_path, "thumbnail": shadow_thumb_path, "caption": final_caption}
+            asset = {"video": custom_file_path, "thumbnail": shadow_thumb_path, "caption": final_caption+caption_addon}
             if not shadow_header:
                 try:
                     shadow_header = await userbot.send_message(config.shadow_channel, message=header_text)
@@ -116,6 +122,7 @@ async def execute_single_batch(messages, batch_index, total_batches, reply_chat_
             sticker_path = os.path.join(ASSETS_DIR, "shadow_sticker.webp")
             if os.path.exists(sticker_path):
                 await userbot.send_message(config.shadow_channel, file=sticker_path)
+            await send_join_link()
         except Exception as e:
             logger.warning(f"Failed to send shadow token to shadow_channel: {e}")
         
