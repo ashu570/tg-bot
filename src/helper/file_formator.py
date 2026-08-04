@@ -15,28 +15,30 @@ def format_video_metadata(original_name: str) -> tuple:
     episode = metadata.get("episode")
     quality = metadata.get("quality")
     audio_tags = metadata.get("custom_audio", [])
+    tif_prefix = "[TIF]"
 
     year_tag = str(year) if year else ""
     quality_tag = str(quality).lower() if quality else ""
-    lang_tag = ".".join([a.title() for a in audio_tags])
+    lang_tag = "_".join([a.title() for a in audio_tags])
     
     se_tag = ""
     if season is not None and episode is not None:
-        se_tag = f"S{int(season):02d}E{int(episode):02d}"
+        se_tag = f"S{int(season):02d}#E{int(episode):02d}"
     elif season is not None:
         se_tag = f"S{int(season):02d}"
     elif episode is not None:
         se_tag = f"E{int(episode):02d}"
 
-    clean_title_dotted = title.replace(" ", ".")
-    file_components = [clean_title_dotted, year_tag, se_tag, lang_tag, quality_tag]
+    final_title = title.replace(" ", "_")
+    se_tag_final = se_tag.replace("#",'_')
+    file_components = [tif_prefix,se_tag_final,final_title,quality_tag,lang_tag]
     final_file_components = [c for c in file_components if c]
-    final_name = ".".join(final_file_components) + ext
-    
-    caption_parts = [title]
-    if year_tag:
-        caption_parts.append(f"({year_tag})")
+    final_name = "_".join(final_file_components) + ext
+
+    caption_year_part = f"({year_tag})\n" if year_tag else "\n"
+    caption_parts = [f"{title}{caption_year_part}"]
     if se_tag:
+        se_tag.replace("#",'')
         caption_parts.append(se_tag)
     if quality_tag:
         caption_parts.append(quality_tag)

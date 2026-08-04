@@ -61,7 +61,7 @@ async def bridge_to_link_bot(shadow_messages: list, reply_chat_id: int, batch_si
         await bot.send_message(reply_chat_id, f"❌ **Error during bridging:** `{e}`")
 
 async def generate_native_link(shadow_messages: list, reply_chat_id: int, batch_size: int, batch_index: int, total_batches: int) -> str:
-    await bot.send_message(
+    link_message = await bot.send_message(
         reply_chat_id, 
         f"🔗 **Stage 4: Generating Link (Batch {batch_index}/{total_batches})...**"
     )
@@ -80,11 +80,13 @@ async def generate_native_link(shadow_messages: list, reply_chat_id: int, batch_
             payload_string = f"get-{first_msg_id * channel_id_abs}-{last_msg_id * channel_id_abs}"
         base64_payload = common_helper.encode_payload(payload_string)
         batch_link = f"https://t.me/{bot_username}?start={base64_payload}"
+        if link_message:
+            await link_message.delete()
         return batch_link
 
     except Exception as e:
         logger.exception(f"Error generating native link: {e}")
-        await bot.send_message(reply_chat_id, f"❌ **Error during link generation:** `{e}`")
+        await bot.send_message(reply_chat_id, f"❌ **Error during link generation:**")
         return None
 
 async def publish_and_cleanup(asset: dict, tracker):
@@ -129,11 +131,14 @@ def generate_header_text(file_name: str) -> str:
     quality = meta.get('quality', '')
     language = meta.get('custom_audio', [])
     year_str = f" ({year})" if year else ""
+    sub = meta.get('custom_subs', [])
     header = (
-        f"🎬 **{title}{year_str}**\n"
-        f"📁 **Season:** {season}\n"
-        f"📺 **Quality:** {quality}\n"
-        f"🔊 **Language:** {", ".join(language)}"
+        f"{title}{year_str}**\n"
+        f"**Season** {season}\n"
+        f"**{quality}**\n"
+        f"**{"+ ".join(language)}**\n"
+        f"**Subtitles {'👍' if len(sub) else '👎'}\n"
+        "👇👇👇👇👇"
     )
     return header
 
