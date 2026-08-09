@@ -12,6 +12,7 @@ from telethon.errors import FloodWaitError
 from src.libs.user_client import bot, userbot
 import re
 from src.ui.shadow_messages import send_join_link, send_final_sticker
+from src.ui.ready_messages import build_tmdb_card
 
 ASSETS_DIR = 'assets'
 DOWNLOAD_DIR = "downloads"
@@ -46,10 +47,43 @@ async def fetch_meta_from_tmdb (query:str, url_part:str):
     
     if best_match:
         poster_path = best_match.get("poster_path")
+        release_date = best_match.get("release_date") or best_match.get("first_air_date") or ""
+        year = release_date.split("-")[0] if release_date else ""
+        rating = best_match.get("vote_average", 0.0)
+        tmdb_id = best_match.get("id")
+        media_type = best_match.get("media_type", "tv")
+        detail_url = f"{config.tmdb_base_url}/{media_type}/{tmdb_id}"
+        detail_params = {"append_to_response": "credits,external_ids"}
+        detail_data = await common_helper.make_request(detail_url, method="GET", response_format="json", params=detail_params, headers=headers)
+        
+        runtime = 0
+        actors = []
+        genres = []
+        imdb_id = ""
+        
+        if detail_data:
+            if media_type == "tv":
+                runtime_list = detail_data.get("episode_run_time", [])
+                runtime = runtime_list[0] if runtime_list else 0
+            else:
+                runtime = detail_data.get("runtime", 0)
+                
+            cast = detail_data.get("credits", {}).get("cast", [])
+            actors = [c.get("name") for c in cast[:4]]
+            genres = [g.get("name") for g in detail_data.get("genres", [])]
+            imdb_id = detail_data.get("external_ids", {}).get("imdb_id", "")
+
         return {
             "overview": best_match.get("overview", "No overview available."),
             "poster_url": f"{config.tmdb_base_image_url}{poster_path}" if poster_path else None,
-            "title": best_match.get("title") or best_match.get("name")
+            "title": best_match.get("title") or best_match.get("name"),
+            "year": year,
+            "rating": round(rating, 1) if rating else 0.0,
+            "media_type": media_type,
+            "runtime": runtime,
+            "actors": actors,
+            "genres": genres,
+            "imdb_id": imdb_id
         }
 
 async def prepare_series_metadata(first_msg):
@@ -68,7 +102,7 @@ async def prepare_series_metadata(first_msg):
                 f.write(image_bytes)
             final_thumb_path = thumb_path
             
-    return first_file_name, final_thumb_path, shadow_thumb_path
+    return first_file_name, final_thumb_path, shadow_thumb_path, tmdb_result
 
 async def execute_single_batch(messages, batch_index, total_batches, reply_chat_id, status_msg, shadow_thumb_path, header_text, season_name):
     total_messages = len(messages)
@@ -131,7 +165,7 @@ async def process_files(batches: list, reply_chat_id: int, final_meta:dict):
         return []
     CANCELLED_EVENTS[reply_chat_id] = asyncio.Event()
     first_msg = batches[0][0]
-    first_file_name, final_thumb_path, shadow_thumb_path = await prepare_series_metadata(first_msg)
+    first_file_name, final_thumb_path, shadow_thumb_path, tmdb_result = await prepare_series_metadata(first_msg)
     series_meta = common_helper.file_meta_extractor(first_file_name)
     season_name =  f"{series_meta.get("title")} S{series_meta.get("season")}"
     status_msg = await bot.send_message(reply_chat_id, f"⏳ Processing {len(batches)} batches for {season_name}...")
@@ -158,12 +192,11 @@ async def process_files(batches: list, reply_chat_id: int, final_meta:dict):
     elif successful_links:
         await status_msg.edit(f"✅** [{season_name}] Processed Successfully.**")
         final_caption = generate_final_message(series_meta, successful_links)
-        results = await userbot.inline_query('imdb', final_meta.get("series_name", ""))
-        if not results:
-            logger.warning(f"No IMDb results found for: {final_meta.get('series_name')}")
+        if tmdb_result:
+            card_text = build_tmdb_card(tmdb_result, final_meta.get("series_name", "Unknown"))
+            await userbot.send_message(config.ready_channel, card_text, link_preview=True)
         else:
-            best_match = results[0]
-            await best_match.click(config.ready_channel)
+            logger.warning(f"No TMDB results found for card generation.")
         await userbot.send_message(
             config.ready_channel, final_caption, 
             file=final_thumb_path if final_thumb_path and os.path.exists(final_thumb_path) else shadow_thumb_path
