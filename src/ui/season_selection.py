@@ -3,13 +3,15 @@ import uuid
 from telethon import Button
 from src.libs.user_client import bot
 from src.libs.logger import logger
-from src.helper.commons import ACTIVE_BATCHES, ACTIVE_SEASON_CARDS 
+from src.helper.commons import ACTIVE_BATCHES, ACTIVE_SELECTION_META, ACTIVE_SEASON_CARDS 
 
 async def generate_season_cards(seasons_data: dict, chat_id: int, current_index: int = 1, total_queries: int = 1, search_query: str = ""):
     if not seasons_data:
         return
     if chat_id not in ACTIVE_BATCHES:
         ACTIVE_BATCHES[chat_id] = {}
+    if chat_id not in ACTIVE_SELECTION_META:
+        ACTIVE_SELECTION_META[chat_id] = {}
     if chat_id not in ACTIVE_SEASON_CARDS:
         ACTIVE_SEASON_CARDS[chat_id] = []
 
@@ -29,13 +31,28 @@ async def generate_season_cards(seasons_data: dict, chat_id: int, current_index:
             )
             keyboard = []
             season_quality_hashes = []
+            season_match = re.search(r"S(\d{2})$", season, re.IGNORECASE)
+            season_number = season_match.group(1) if season_match else None
             for quality_key, episodes in qualities.items():
+                quality_parts = quality_key.split("#")
+                quality_value = quality_parts[0].strip()
+                audio_values = []
+                if len(quality_parts) > 1 and quality_parts[1].strip():
+                    audio_values = [item.strip() for item in quality_parts[1].split(",") if item.strip()]
+
                 short_hash = uuid.uuid4().hex[:6]
                 season_quality_hashes.append(short_hash)
                 group_quality_hashes.append(short_hash)
                 ACTIVE_BATCHES[chat_id][short_hash] = list(episodes.values())
+                # Add year, subititle
+                ACTIVE_SELECTION_META[chat_id][short_hash] = {
+                    "series": series_title,
+                    "season_number": season_number,
+                    "qualities": quality_value,
+                    "audio": audio_values,
+                }
                 ep_count = len(episodes)
-                button_text = f"{quality_key} ({ep_count} EPs)"
+                button_text = f"{quality_key.replace('#','')} ({ep_count} EPs)"
                 cb_data = f"p|{short_hash}".encode('utf-8')
                 keyboard.append([Button.inline(button_text, data=cb_data)])
 
@@ -51,9 +68,8 @@ async def generate_season_cards(seasons_data: dict, chat_id: int, current_index:
             series_hash = uuid.uuid4().hex[:6]
             ACTIVE_BATCHES[chat_id][series_hash] = "#".join(group_quality_hashes)
             series_card_text = (
-                f"📦 **[Batch: {current_index}/{total_queries}] Query:** `{search_query}`\n"
-                f"🎬 **{series_title}**\n"
-                f"Process all seasons in this series together:"
+                f"🎬 **Title: {series_title}**\n"
+                f"Process all seasons in this series"
             )
             sent_msg = await bot.send_message(chat_id, series_card_text, buttons=[[Button.inline("⏬ Process ALL Seasons", data=f"p|{series_hash}".encode('utf-8'))]])
             ACTIVE_SEASON_CARDS[chat_id].append(sent_msg.id)

@@ -15,7 +15,12 @@ class CommonHelper:
     def file_meta_extractor(self, original_name:str):
         name, _ = os.path.splitext(original_name)
         delim = r'[\.\-\_\$\&\%\#\*\s]'
+        
         clean_name = re.sub(rf'^\d+{delim}+', '', name)
+        clean_name = re.sub(r'(?:\[[^\]]*\]|「[^」]*」|\{[^}]*\}|\([^)]*\)|【[^】]*】|<[^>]*>)', ' ', clean_name)
+        clean_name = re.sub(r'@[-_\w]+', ' ', clean_name)
+        clean_name = re.sub(r'[_\.\-]+', ' ', clean_name)
+        clean_name = re.sub(r'\s+', ' ', clean_name).strip()
 
         audio_pattern = r'(?i)(?<![a-z])(hindi|hin|english|eng|dual|multi)(?:[\s/*._$&#\-]*audio)?(?![a-z])'
         sub_pattern = r'(?i)(?<![a-z])(e|m|multi|dual|h|kor|spanish|hin|eng|hindi|english|engish|korean|german|ger|it|italian|ru|russian)?[\s/*._$&#\-]*(?:subs?|subtitles?)(?![a-z])'
@@ -27,7 +32,7 @@ class CommonHelper:
         title = guessed_data.get('title', clean_name)
         final_title = re.sub(r'\s+', ' ', str(title)).strip().title()
         metadata = {
-            "title": final_title,
+            "title": final_title.title(),
             "season": guessed_data.get('season'),
             "episode": guessed_data.get('episode'),
             "year": guessed_data.get('year'),
@@ -81,6 +86,7 @@ class CommonHelper:
     
 common_helper = CommonHelper()
 ACTIVE_BATCHES = {}
+ACTIVE_SELECTION_META = {}
 CANCELLED_EVENTS = {}
 ACTIVE_SEASON_CARDS={}
 USER_SESSIONS = {}

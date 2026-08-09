@@ -4,7 +4,7 @@ from telethon.errors import FloodWaitError
 from src.libs.logger import logger
 from src.libs.user_client import bot
 from src.pipeline.ingestion import ingest_raw_files 
-from src.helper.commons import ACTIVE_BATCHES, CANCELLED_EVENTS, ACTIVE_SEASON_CARDS, USER_SESSIONS, common_helper
+from src.helper.commons import ACTIVE_BATCHES, ACTIVE_SELECTION_META, CANCELLED_EVENTS, ACTIVE_SEASON_CARDS, USER_SESSIONS, common_helper
 from src.pipeline.processing import handle_series_selection
 from config import config
 
@@ -20,6 +20,8 @@ async def trigger_processing(event):
     raw_queries = event.pattern_match.group(1).strip()
     queries = [q.strip() for q in raw_queries.split(',') if q.strip()]
     ACTIVE_BATCHES.pop(chat_id, None)
+    ACTIVE_SELECTION_META.pop(chat_id, None)
+    ACTIVE_SEASON_CARDS.pop(chat_id, None)
     await event.respond(f"🔍 Starting batch process for **{len(queries)}** queries...")
     USER_SESSIONS[chat_id] = {
             'pending_queries': queries,
