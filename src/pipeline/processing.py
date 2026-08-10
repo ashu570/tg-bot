@@ -12,7 +12,7 @@ from telethon.errors import FloodWaitError
 from src.libs.user_client import bot, userbot
 import re
 from src.ui.shadow_messages import send_join_link, send_final_sticker
-from src.ui.ready_messages import build_tmdb_card
+from src.ui.ready_messages import build_tmdb_card, build_quality_cards
 
 ASSETS_DIR = 'assets'
 DOWNLOAD_DIR = "downloads"
@@ -177,7 +177,10 @@ async def process_files(batches: list, reply_chat_id: int, final_meta:dict):
         messages.sort(key=lambda msg: format_video_metadata(msg.file.name if msg.file else msg.text)[0] or "")
         batch_first_file = messages[0].file.name if messages[0].file else messages[0].text
         batch_meta = common_helper.file_meta_extractor(batch_first_file)
-        quality_key = f"{batch_meta.get('quality', 'Unknown')}-{', '.join(batch_meta.get('custom_audio', []))}".strip()
+        quality = batch_meta.get('quality', 'Unknown')
+        season = batch_meta.get('season')
+        audio_tags = batch_meta.get('custom_audio') or ['Default Audio']
+        season_key = f"Season#{season}" if season is not None else "Season"
         header_text = generate_header_text(format_video_metadata(batch_first_file)[1])
         shadow_messages, is_cancelled = await execute_single_batch(
             messages, batch_index, len(batches), reply_chat_id, status_msg, shadow_thumb_path, header_text, season_name
@@ -185,22 +188,34 @@ async def process_files(batches: list, reply_chat_id: int, final_meta:dict):
         if not is_cancelled and shadow_messages:
             batch_link = await generate_native_link(shadow_messages, reply_chat_id, len(shadow_messages), batch_index, len(batches))
             if batch_link:
-                successful_links[quality_key] = batch_link
+                successful_links.setdefault(quality, {}).setdefault(season_key, {})
+                for audio_tag in audio_tags:
+                    successful_links[quality][season_key][audio_tag] = batch_link
     CANCELLED_EVENTS.pop(reply_chat_id, None)
     if is_cancelled:
         await status_msg.edit(f"🛑** [{season_name}] Process Cancelled.**")
     elif successful_links:
         await status_msg.edit(f"✅** [{season_name}] Processed Successfully.**")
-        final_caption = generate_final_message(series_meta, successful_links)
         if tmdb_result:
-            card_text = build_tmdb_card(tmdb_result, final_meta.get("series_name", "Unknown"))
-            await userbot.send_message(config.ready_channel, card_text, link_preview=True)
+            final_meta["year"] = tmdb_result.get("year",'')
+            card_text = build_tmdb_card(tmdb_result, final_meta.get("title"))
+            await userbot.send_message(config.ready_channel, card_text)
+            await userbot.send_message(config.ready_channel, f"**{final_meta.get("title")} • {tmdb_result.get("year",'')}**")
         else:
             logger.warning(f"No TMDB results found for card generation.")
+            await userbot.send_message(config.ready_channel, f"**{final_meta.get("title")}**")
+
+        final_caption = generate_final_message(successful_links, final_meta)
         await userbot.send_message(
-            config.ready_channel, final_caption, 
-            file=final_thumb_path if final_thumb_path and os.path.exists(final_thumb_path) else shadow_thumb_path
+                config.ready_channel, final_caption, 
+                file=final_thumb_path if final_thumb_path and os.path.exists(final_thumb_path) else shadow_thumb_path
         )
+        cards = build_quality_cards(successful_links, final_meta)
+        for card_text in cards:
+            await userbot.send_message(
+                config.ready_channel, card_text, 
+                link_preview=False
+            )
         await bot.send_message(reply_chat_id, f"✅ Archive Complete!\nBroadcasted {len(successful_links)} quality tiers.")
     else:
         await bot.send_message(reply_chat_id, "❌ **Archive Failed:** No successful batches were bridged.")
@@ -212,8 +227,8 @@ async def process_files(batches: list, reply_chat_id: int, final_meta:dict):
 def merge_selection_meta(selection_meta: dict, meta: dict):
     if not meta:
         return
-    if not selection_meta["series_name"]:
-        selection_meta["series_name"] = meta.get("series")
+    if not selection_meta["title"]:
+        selection_meta["title"] = meta.get("series")
 
     season_numbers = meta.get("season_numbers") or ([meta.get("season_number")] if meta.get("season_number") else [])
     if season_numbers:
@@ -245,7 +260,7 @@ async def handle_series_selection(chat_id: int, target_hash: str):
     target_meta = ACTIVE_SELECTION_META.get(chat_id, {}).get(target_hash, {})
     batches_to_process = []
     metadata_summary = {
-        "series_name": target_meta.get("series"),
+        "title": target_meta.get("series"),
         "season_numbers": [],
         "qualities": [],
         "audio": []

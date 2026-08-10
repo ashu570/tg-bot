@@ -142,11 +142,11 @@ def generate_header_text(file_name: str) -> str:
     )
     return header
 
-def generate_final_message(metadata: dict, successful_links: dict) -> str:
-    title = metadata.get("title", "UNKNOWN TITLE").upper()
-    year = metadata.get("year", "")
-    season = metadata.get("season", "1")
-    sub = metadata.get("custom_subs", "[]")
+def generate_final_message (successful_links: dict, final_meta:dict) -> str:
+    title = final_meta.get("title", "UNKNOWN TITLE").upper()
+    year = final_meta.get("year", "")
+    season = final_meta.get("season", "1")
+    sub = final_meta.get("custom_subs", "[]")
     year_str = f" • {year}" if year else ""
     caption = (
         f"🎭 {title}{year_str}\n"
