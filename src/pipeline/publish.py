@@ -145,15 +145,20 @@ def generate_header_text(file_name: str) -> str:
 def generate_final_message (successful_links: dict, final_meta:dict) -> str:
     title = final_meta.get("title", "UNKNOWN TITLE").upper()
     year = final_meta.get("year", "")
-    season = final_meta.get("season", "1")
+    raw_season = final_meta.get("selected_seasons", "1")
+    season_seq = '1'
+    if raw_season:
+        sorted_season_meta = sorted(map(int, raw_season))
+        season_seq = "1" if not sorted_season_meta else str(sorted_season_meta[0]) if len(sorted_season_meta) == 1 else f"{sorted_season_meta[0]}-{sorted_season_meta[-1]}"
+
     sub = final_meta.get("custom_subs", "[]")
     year_str = f" • {year}" if year else ""
     caption = (
         f"🎭 {title}{year_str}\n"
-        f"📁 SEASON - {season}\n"
+        f"📁 SEASON - {season_seq}\n"
         f"💬 SUBTITLES - {'👍' if len(sub) > 0 and sub != '[]' else '👎'}\n"
         f"\n"
-        f"📦 **AVAILABLE QUALITIES:**\n"
+        f"📦 **QUALITIES:**\n"
     )
     for quality_label, link in successful_links.items():
         formatted_label = quality_label.strip().upper()

@@ -181,16 +181,11 @@ async def process_files(batches: list, reply_chat_id: int, final_meta:dict):
         season = batch_meta.get('season')
         audio_tags = batch_meta.get('custom_audio') or ['Default Audio']
         season_key = f"Season#{season}" if season is not None else "Season"
-        part = None
-        part_source = batch_meta.get("part")
-        if isinstance(part_source, tuple) and len(part_source) == 2:
-            part = f"{part_source[0]}-{part_source[1]}"
+        part = batch_meta.get("part")
         header_text = generate_header_text(format_video_metadata(batch_first_file)[1])
         shadow_messages, is_cancelled = await execute_single_batch(
             messages, batch_index, len(batches), reply_chat_id, status_msg, shadow_thumb_path, header_text, season_name
         ) 
-
-        shadow_messages = []
         if not is_cancelled and shadow_messages:
             if part and len(part):
                 season_key = f"{season_key}({part})"

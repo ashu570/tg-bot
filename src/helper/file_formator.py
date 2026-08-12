@@ -21,12 +21,10 @@ def format_video_metadata(original_name: str) -> tuple:
     year_tag = str(year) if year else ""
     quality_tag = str(quality).lower() if quality else ""
     lang_tag = "_".join([a.title() for a in audio_tags])
-
-
     
     se_tag = ""
     if season is not None and episode is not None and len(part):
-            se_tag = f"S{int(season):02d}#{part}#E{int(episode):02d}"
+            se_tag = f"S{int(season):02d}# {part} #E{int(episode):02d}"
     elif season is not None and episode is not None:
         se_tag = f"S{int(season):02d}#E{int(episode):02d}"
     elif season is not None:
@@ -41,7 +39,7 @@ def format_video_metadata(original_name: str) -> tuple:
     final_name = "_".join(final_file_components) + ext
 
     caption_year_part = f"({year_tag})\n" if year_tag else "\n"
-    caption_parts = [f"{title}{caption_year_part}"]
+    caption_parts = [f"**{title}{caption_year_part}**"]
     if se_tag:
         caption_parts.append(f"**{se_tag.replace('#','')}**")
     if quality_tag:
