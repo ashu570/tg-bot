@@ -16,8 +16,10 @@ def extract_metadata(text: str) -> tuple:
         season = "Movie"
         episode = file_meta.get('title', 'Full Movie')
 
+    part = file_meta.get("part")
+
     quality = q_match.group(1).lower() if q_match else "NA"
-    return season, episode, quality, ". ".join(file_meta.get("custom_audio",[])), file_meta.get('title', 'Default')
+    return season, episode, quality, ". ".join(file_meta.get("custom_audio", [])), file_meta.get('title', 'Default'), part
 
 def segregate_and_dedupe(messages: list[Message]) -> dict:
     """
@@ -33,9 +35,11 @@ def segregate_and_dedupe(messages: list[Message]) -> dict:
                     file_name = attr.file_name
                     break
         text_to_parse = file_name if file_name else (msg.text or "")
-        season, episode, quality, language, title = extract_metadata(text_to_parse)
+        season, episode, quality, language, title, part = extract_metadata(text_to_parse)
         if season == "Unknown" or episode == "Unknown":
             continue 
+        if len(part):
+            season = f"{season} {part}"
         quality_lang_key = f"{quality}#{language}".strip()
         if episode in seasons_data[f"{title} {season}".strip().title()][quality_lang_key]:
            duplicate_count+=1

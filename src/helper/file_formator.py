@@ -15,14 +15,19 @@ def format_video_metadata(original_name: str) -> tuple:
     episode = metadata.get("episode")
     quality = metadata.get("quality")
     audio_tags = metadata.get("custom_audio", [])
+    part = metadata.get("part")
     tif_prefix = "[TIF]"
 
     year_tag = str(year) if year else ""
     quality_tag = str(quality).lower() if quality else ""
     lang_tag = "_".join([a.title() for a in audio_tags])
+
+
     
     se_tag = ""
-    if season is not None and episode is not None:
+    if season is not None and episode is not None and len(part):
+            se_tag = f"S{int(season):02d}#{part}#E{int(episode):02d}"
+    elif season is not None and episode is not None:
         se_tag = f"S{int(season):02d}#E{int(episode):02d}"
     elif season is not None:
         se_tag = f"S{int(season):02d}"

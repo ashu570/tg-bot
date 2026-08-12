@@ -17,7 +17,7 @@ async def generate_season_cards(seasons_data: dict, chat_id: int, current_index:
 
     grouped_series = {}
     for season, qualities in sorted(seasons_data.items()):
-        match = re.match(r"(.+?)\s+S\d{2}$", season, re.IGNORECASE)
+        match = re.match(r"(.+?)\s+S\d{2}(?:\s+.+)?$", season, re.IGNORECASE)
         series_title = match.group(1).strip() if match else season
         grouped_series.setdefault(series_title, []).append((season, qualities))
 
@@ -31,8 +31,9 @@ async def generate_season_cards(seasons_data: dict, chat_id: int, current_index:
             )
             keyboard = []
             season_quality_hashes = []
-            season_match = re.search(r"S(\d{2})$", season, re.IGNORECASE)
+            season_match = re.search(r"\bS(\d{2})\b(?:\s+(.+))?$", season, re.IGNORECASE)
             season_number = season_match.group(1) if season_match else None
+            part = season_match.group(2).strip() if season_match and season_match.group(2) else None
             for quality_key, episodes in qualities.items():
                 quality_parts = quality_key.split("#")
                 quality_value = quality_parts[0].strip()
@@ -50,6 +51,7 @@ async def generate_season_cards(seasons_data: dict, chat_id: int, current_index:
                     "season_number": season_number,
                     "qualities": quality_value,
                     "audio": audio_values,
+                    "part": part
                 }
                 ep_count = len(episodes)
                 button_text = f"{quality_key.replace('#','')} ({ep_count} EPs)"

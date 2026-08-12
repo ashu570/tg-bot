@@ -27,7 +27,13 @@ class CommonHelper:
         extracted_audio_raw = [lang.lower() for lang in re.findall(audio_pattern, re.sub(sub_pattern, '', name))]
         audio_tags = [language_map.get(lang, lang) for lang in extracted_audio_raw]
         sub_tags = [lang.lower() for lang in re.findall(sub_pattern, name) if lang]
-        
+
+        raw_part_source = self.extract_groups(original_name)
+        raw_part= next(iter(raw_part_source.items()), None)
+        part = ''
+        if isinstance(raw_part, tuple) and len(raw_part) == 2:
+            part = f"{raw_part[0].title()}-{raw_part[1]}"
+
         guessed_data = guessit(clean_name)
         title = guessed_data.get('title', clean_name)
         final_title = re.sub(r'\s+', ' ', str(title)).strip().title()
@@ -38,7 +44,8 @@ class CommonHelper:
             "year": guessed_data.get('year'),
             "quality": guessed_data.get('screen_size'),
             "custom_audio": audio_tags,
-            "custom_subs": sub_tags
+            "custom_subs": sub_tags,
+            "part": part
         }
         return metadata
     
@@ -83,6 +90,16 @@ class CommonHelper:
         base64_bytes = (base64_string + "=" * (-len(base64_string) % 4)).encode("ascii")
         string_bytes = base64.urlsafe_b64decode(base64_bytes) 
         return string_bytes.decode("ascii")
+
+    def extract_groups(self, filename: str) -> dict:
+        result = {}
+        for match in GROUP_PATTERN.finditer(filename):
+            alias = match.group(1).lower()
+            group = ALIASES[alias]
+            value = int(match.group(2))
+            if group not in result:
+                result[group] = value
+        return result
     
 common_helper = CommonHelper()
 ACTIVE_BATCHES = {}
@@ -112,3 +129,29 @@ language_map = {
     'dual': "Dual",
     'multi': "Multi"
 }
+
+GROUP_ALIASES = {
+    "part": ["part", "pt", "p"],
+    "volume": ["volume", "vol", "volm"],
+    "cour": ["cour"],
+    "arc": ["arc"],
+    "chapter": ["chapter", "chap", "ch"],
+    "book": ["book", "bk"],
+    "act": ["act"],
+    "phase": ["phase", "ph"],
+    "cut": ["cut"],
+    "edition": ["edition", "ed"],
+    "version": ["version", "ver", "v"],
+}
+
+ALIASES = {
+    alias: group
+    for group, aliases in GROUP_ALIASES.items()
+    for alias in aliases
+}
+
+GROUP_PATTERN = re.compile(
+    r"(?i)\b("
+    + "|".join(sorted(ALIASES, key=len, reverse=True))
+    + r")[\s._-]*(\d{1,3})\b"
+)
