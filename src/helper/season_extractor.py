@@ -36,7 +36,7 @@ def segregate_and_dedupe(messages: list[Message]) -> dict:
         season, episode, quality, language, title = extract_metadata(text_to_parse)
         if season == "Unknown" or episode == "Unknown":
             continue 
-        quality_lang_key = f"{quality} {language}".strip()
+        quality_lang_key = f"{quality}#{language}".strip()
         if episode in seasons_data[f"{title} {season}".strip().title()][quality_lang_key]:
            duplicate_count+=1
            pass

@@ -3,7 +3,7 @@ import asyncio
 from src.libs.logger import logger
 from src.libs.user_client import bot
 from src.pipeline.publish import publish_and_cleanup,generate_header_text, bridge_to_link_bot, generate_final_message, generate_native_link
-from src.helper.commons import ACTIVE_BATCHES, common_helper, CANCELLED_EVENTS
+from src.helper.commons import ACTIVE_BATCHES, ACTIVE_SELECTION_META, common_helper, CANCELLED_EVENTS
 from src.helper.file_formator import format_video_metadata
 from src.helper.progress_tracker import ProgressTracker, ProcessCancelledError
 from config import config
@@ -11,13 +11,15 @@ import cryptg
 from telethon.errors import FloodWaitError
 from src.libs.user_client import bot, userbot
 import re
+from src.ui.shadow_messages import send_join_link, send_final_sticker
+from src.ui.ready_messages import build_tmdb_card, build_quality_cards
 
 ASSETS_DIR = 'assets'
 DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-async def fetch_meta_from_tmdb (query:str):
-    url = f"{config.tmdb_base_url}/search/multi"
+async def fetch_meta_from_tmdb (query:str, url_part:str):
+    url = f"{config.tmdb_base_url}{url_part}"
     params = {
         "query": query
     }
@@ -45,10 +47,43 @@ async def fetch_meta_from_tmdb (query:str):
     
     if best_match:
         poster_path = best_match.get("poster_path")
+        release_date = best_match.get("release_date") or best_match.get("first_air_date") or ""
+        year = release_date.split("-")[0] if release_date else ""
+        rating = best_match.get("vote_average", 0.0)
+        tmdb_id = best_match.get("id")
+        media_type = best_match.get("media_type", "tv")
+        detail_url = f"{config.tmdb_base_url}/{media_type}/{tmdb_id}"
+        detail_params = {"append_to_response": "credits,external_ids"}
+        detail_data = await common_helper.make_request(detail_url, method="GET", response_format="json", params=detail_params, headers=headers)
+        
+        runtime = 0
+        actors = []
+        genres = []
+        imdb_id = ""
+        
+        if detail_data:
+            if media_type == "tv":
+                runtime_list = detail_data.get("episode_run_time", [])
+                runtime = runtime_list[0] if runtime_list else 0
+            else:
+                runtime = detail_data.get("runtime", 0)
+                
+            cast = detail_data.get("credits", {}).get("cast", [])
+            actors = [c.get("name") for c in cast[:4]]
+            genres = [g.get("name") for g in detail_data.get("genres", [])]
+            imdb_id = detail_data.get("external_ids", {}).get("imdb_id", "")
+
         return {
             "overview": best_match.get("overview", "No overview available."),
             "poster_url": f"{config.tmdb_base_image_url}{poster_path}" if poster_path else None,
-            "title": best_match.get("title") or best_match.get("name")
+            "title": best_match.get("title") or best_match.get("name"),
+            "year": year,
+            "rating": round(rating, 1) if rating else 0.0,
+            "media_type": media_type,
+            "runtime": runtime,
+            "actors": actors,
+            "genres": genres,
+            "imdb_id": imdb_id
         }
 
 async def prepare_series_metadata(first_msg):
@@ -57,7 +92,7 @@ async def prepare_series_metadata(first_msg):
     shadow_thumb_path = os.path.join(ASSETS_DIR, f"tif_logo.jpg")
     final_thumb_path = None
     
-    tmdb_result = await fetch_meta_from_tmdb(common_helper.clean_file_name(first_msg_name))
+    tmdb_result = await fetch_meta_from_tmdb(common_helper.clean_file_name(first_msg_name), '/search/multi')
     if tmdb_result and tmdb_result.get("poster_url"):
         image_bytes = await common_helper.make_request(tmdb_result.get("poster_url"), method="GET", response_format="bytes")
         if image_bytes:
@@ -67,7 +102,7 @@ async def prepare_series_metadata(first_msg):
                 f.write(image_bytes)
             final_thumb_path = thumb_path
             
-    return first_file_name, final_thumb_path, shadow_thumb_path
+    return first_file_name, final_thumb_path, shadow_thumb_path, tmdb_result
 
 async def execute_single_batch(messages, batch_index, total_batches, reply_chat_id, status_msg, shadow_thumb_path, header_text, season_name):
     total_messages = len(messages)
@@ -78,6 +113,11 @@ async def execute_single_batch(messages, batch_index, total_batches, reply_chat_
     for index, msg in enumerate(messages, start=1):
         raw_name = msg.file.name if msg.file else msg.text
         new_filename, final_caption = format_video_metadata(raw_name)
+        caption_addon = (
+            f"\n"
+            f"༄༅──────────────༅༄\n"
+            f"@TIFDiscuss 🌹 @TIF_WebSeries"
+        )
         custom_file_path = os.path.join(DOWNLOAD_DIR, new_filename if new_filename else '')
         try:
             tracker = ProgressTracker(status_msg, index, batch_index, total_batches, total_messages, reply_chat_id,season_name, "Download")
@@ -85,7 +125,7 @@ async def execute_single_batch(messages, batch_index, total_batches, reply_chat_
             if not original_file_path:
                 logger.error(f"Failed to download {new_filename}")
                 continue
-            asset = {"video": custom_file_path, "thumbnail": shadow_thumb_path, "caption": final_caption}
+            asset = {"video": custom_file_path, "thumbnail": shadow_thumb_path, "caption": final_caption+caption_addon}
             if not shadow_header:
                 try:
                     shadow_header = await userbot.send_message(config.shadow_channel, message=header_text)
@@ -113,20 +153,19 @@ async def execute_single_batch(messages, batch_index, total_batches, reply_chat_
                 os.remove(custom_file_path)  
     if shadow_messages:
         try:
-            sticker_path = os.path.join(ASSETS_DIR, "shadow_sticker.webp")
-            if os.path.exists(sticker_path):
-                await userbot.send_message(config.shadow_channel, file=sticker_path)
+            await send_join_link()
+            await send_final_sticker()
         except Exception as e:
             logger.warning(f"Failed to send shadow token to shadow_channel: {e}")
         
     return shadow_messages, is_cancelled
 
-async def process_files(batches: list, reply_chat_id: int):
+async def process_files(batches: list, reply_chat_id: int, final_meta:dict):
     if not batches:
         return []
     CANCELLED_EVENTS[reply_chat_id] = asyncio.Event()
     first_msg = batches[0][0]
-    first_file_name, final_thumb_path, shadow_thumb_path = await prepare_series_metadata(first_msg)
+    first_file_name, final_thumb_path, shadow_thumb_path, tmdb_result = await prepare_series_metadata(first_msg)
     series_meta = common_helper.file_meta_extractor(first_file_name)
     season_name =  f"{series_meta.get("title")} S{series_meta.get("season")}"
     status_msg = await bot.send_message(reply_chat_id, f"⏳ Processing {len(batches)} batches for {season_name}...")
@@ -138,7 +177,10 @@ async def process_files(batches: list, reply_chat_id: int):
         messages.sort(key=lambda msg: format_video_metadata(msg.file.name if msg.file else msg.text)[0] or "")
         batch_first_file = messages[0].file.name if messages[0].file else messages[0].text
         batch_meta = common_helper.file_meta_extractor(batch_first_file)
-        quality_key = f"{batch_meta.get('quality', 'Unknown')}-{', '.join(batch_meta.get('custom_audio', []))}".strip()
+        quality = batch_meta.get('quality', 'Unknown')
+        season = batch_meta.get('season')
+        audio_tags = batch_meta.get('custom_audio') or ['Default Audio']
+        season_key = f"Season#{season}" if season is not None else "Season"
         header_text = generate_header_text(format_video_metadata(batch_first_file)[1])
         shadow_messages, is_cancelled = await execute_single_batch(
             messages, batch_index, len(batches), reply_chat_id, status_msg, shadow_thumb_path, header_text, season_name
@@ -146,17 +188,34 @@ async def process_files(batches: list, reply_chat_id: int):
         if not is_cancelled and shadow_messages:
             batch_link = await generate_native_link(shadow_messages, reply_chat_id, len(shadow_messages), batch_index, len(batches))
             if batch_link:
-                successful_links[quality_key] = batch_link
+                successful_links.setdefault(quality, {}).setdefault(season_key, {})
+                for audio_tag in audio_tags:
+                    successful_links[quality][season_key][audio_tag] = batch_link
     CANCELLED_EVENTS.pop(reply_chat_id, None)
     if is_cancelled:
         await status_msg.edit(f"🛑** [{season_name}] Process Cancelled.**")
     elif successful_links:
         await status_msg.edit(f"✅** [{season_name}] Processed Successfully.**")
-        final_caption = generate_final_message(series_meta, successful_links)
+        if tmdb_result:
+            final_meta["year"] = tmdb_result.get("year",'')
+            card_text = build_tmdb_card(tmdb_result, final_meta.get("title"))
+            await userbot.send_message(config.ready_channel, card_text)
+            await userbot.send_message(config.ready_channel, f"**{final_meta.get("title")} • {tmdb_result.get("year",'')}**")
+        else:
+            logger.warning(f"No TMDB results found for card generation.")
+            await userbot.send_message(config.ready_channel, f"**{final_meta.get("title")}**")
+
+        final_caption = generate_final_message(successful_links, final_meta)
         await userbot.send_message(
-            config.ready_channel, final_caption, 
-            file=final_thumb_path if final_thumb_path and os.path.exists(final_thumb_path) else shadow_thumb_path
+                config.ready_channel, final_caption, 
+                file=final_thumb_path if final_thumb_path and os.path.exists(final_thumb_path) else shadow_thumb_path
         )
+        cards = build_quality_cards(successful_links, final_meta)
+        for card_text in cards:
+            await userbot.send_message(
+                config.ready_channel, card_text, 
+                link_preview=False
+            )
         await bot.send_message(reply_chat_id, f"✅ Archive Complete!\nBroadcasted {len(successful_links)} quality tiers.")
     else:
         await bot.send_message(reply_chat_id, "❌ **Archive Failed:** No successful batches were bridged.")
@@ -164,22 +223,65 @@ async def process_files(batches: list, reply_chat_id: int):
     if final_thumb_path and final_thumb_path != shadow_thumb_path and os.path.exists(final_thumb_path):
         os.remove(final_thumb_path)
 
+
+def merge_selection_meta(selection_meta: dict, meta: dict):
+    if not meta:
+        return
+    if not selection_meta["title"]:
+        selection_meta["title"] = meta.get("series")
+
+    season_numbers = meta.get("season_numbers") or ([meta.get("season_number")] if meta.get("season_number") else [])
+    if season_numbers:
+        if isinstance(season_numbers, list):
+            selection_meta["season_numbers"].extend(season_numbers)
+        else:
+            selection_meta["season_numbers"].append(season_numbers)
+
+    qualities = meta.get("qualities_audio") or meta.get("qualities")
+    if qualities:
+        if isinstance(qualities, list):
+            selection_meta["qualities"].extend(qualities)
+        else:
+            selection_meta["qualities"].append(qualities)
+
+    audio_items = meta.get("audio")
+    if audio_items:
+        if isinstance(audio_items, list):
+            selection_meta["audio"].extend(audio_items)
+        else:
+            selection_meta["audio"].append(audio_items)
+
+
 async def handle_series_selection(chat_id: int, target_hash: str):
     if chat_id not in ACTIVE_BATCHES or target_hash not in ACTIVE_BATCHES[chat_id]:
         logger.error(f"Session expired or data not found for chat {chat_id}.")
         return
     target_key = ACTIVE_BATCHES[chat_id][target_hash]
+    target_meta = ACTIVE_SELECTION_META.get(chat_id, {}).get(target_hash, {})
     batches_to_process = []
+    metadata_summary = {
+        "title": target_meta.get("series"),
+        "season_numbers": [],
+        "qualities": [],
+        "audio": []
+    }
+
     if isinstance(target_key, str):
-        child_hashes = target_key.split("#")
-        for c_hash in child_hashes:
+        for c_hash in target_key.split("#"):
             if c_hash in ACTIVE_BATCHES[chat_id]:
                 episode_list = ACTIVE_BATCHES[chat_id][c_hash]
                 if episode_list:
                     batches_to_process.append(episode_list)
+            merge_selection_meta(metadata_summary, ACTIVE_SELECTION_META.get(chat_id, {}).get(c_hash, {}))
     elif isinstance(target_key, list):
         batches_to_process.append(target_key)
+        merge_selection_meta(metadata_summary, target_meta)
+
+    metadata_summary["selected_seasons"] = list(dict.fromkeys(metadata_summary["season_numbers"]))
+    metadata_summary["qualities"] = list(dict.fromkeys(metadata_summary["qualities"]))
+    metadata_summary["audio"] = list(dict.fromkeys(metadata_summary["audio"]))
+    logger.info(f"Comprehensive selection meta for {target_hash}: {metadata_summary}")
     try:
-        await process_files(batches_to_process, chat_id)
+        await process_files(batches_to_process, chat_id, metadata_summary)
     except Exception as e:
         logger.error(f"Error handling batch handoff execution for chat {chat_id}: {e}", exc_info=True)
