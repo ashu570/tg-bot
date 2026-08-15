@@ -3,8 +3,11 @@ import math
 import logging
 from src.helper.commons import CANCELLED_EVENTS
 from telethon import Button
+from telethon.errors import FloodWaitError
 
 logger = logging.getLogger(__name__)
+UPDATE_THROTTLE = 5
+RATE_LIMIT_UNTIL = {}
 
 class ProcessCancelledError(Exception):
     pass
@@ -28,9 +31,12 @@ class ProgressTracker:
             logger.info(f"Cancel event detected for chat_id {self.chat_id}. Stopping {self.type}.")
             raise ProcessCancelledError("Process was cancelled by the user.")
         now = time.time()
-        if now - self.last_update < 3 and current < total:
+        if now - self.last_update < UPDATE_THROTTLE and current < total:
             return
         self.last_update = now
+        limit = RATE_LIMIT_UNTIL.get(self.chat_id)
+        if limit and now < limit:
+            return
         
         percent = (current / total) * 100
         speed = current / (now - self.start_time)
@@ -54,5 +60,8 @@ class ProgressTracker:
         
         try:
             await self.status_message.edit(text, buttons=[Button.inline("🛑 STOP", data=f"cancel|{self.chat_id}")])
+        except FloodWaitError as e:
+            RATE_LIMIT_UNTIL[self.chat_id] = time.time() + e.seconds
+            logger.warning(f"Rate limited editing status for chat_id {self.chat_id}: wait {e.seconds}s")
         except Exception as e:
             logger.error(f"ProgressTracker: Failed to edit status message for chat_id {self.chat_id}: {e}")

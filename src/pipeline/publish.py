@@ -10,6 +10,7 @@ from src.helper.commons import common_helper
 from telethon.errors import FloodWaitError
 from telethon.tl.types import DocumentAttributeVideo
 from src.helper.progress_tracker import ProgressTracker, ProcessCancelledError
+from src.ui.ready_messages import to_small_caps
 
 LINK_BOT_USERNAME = "@Links_X_Bot"
 
@@ -132,9 +133,13 @@ def generate_header_text(file_name: str) -> str:
     language = meta.get('custom_audio', [])
     year_str = f" ({year})" if year else ""
     sub = meta.get('custom_subs', [])
+    part = meta.get('part','')
+
+    part_str = f"**({part})**" if part and len(part) else ''
+
     header = (
-        f"{title}{year_str}**\n"
-        f"**Season** {season}\n"
+        f"**{title}{year_str}**\n"
+        f"**Season** {season} {part_str}\n"
         f"**{quality}**\n"
         f"**Audio - {"+ ".join(language)}**\n"
         f"**Subtitles {'👍' if len(sub) else '👎'}\n"
@@ -153,16 +158,16 @@ def generate_final_message (successful_links: dict, final_meta:dict) -> str:
 
     sub = final_meta.get("custom_subs", "[]")
     year_str = f" • {year}" if year else ""
+
+    quality_labels = [to_small_caps(quality_label.strip()) for quality_label in successful_links.keys()]
     caption = (
-        f"🎭 {title}{year_str}\n"
-        f"📁 SEASON - {season_seq}\n"
-        f"💬 SUBTITLES - {'👍' if len(sub) > 0 and sub != '[]' else '👎'}\n"
+        f"🎭 {to_small_caps(title)}{year_str}\n"
+        f"📁 {to_small_caps('SEASON')} - {season_seq}\n"
+        f"💬 {to_small_caps('SUBTITLES')} - {'👍' if len(sub) > 0 and sub != '[]' else '👎'}\n"
         f"\n"
-        f"📦 **QUALITIES:**\n"
+        f"📦 **{to_small_caps('QUALITY')}**\n"
+        f"|| {' || '.join(quality_labels)} ||\n"
     )
-    for quality_label, link in successful_links.items():
-        formatted_label = quality_label.strip().upper()
-        caption += f"🔗 **[{formatted_label}]({link})**\n"
     caption += (
         f"\n"
         f"༄༅──────────────༅༄\n"

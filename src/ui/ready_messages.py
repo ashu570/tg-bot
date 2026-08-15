@@ -4,13 +4,27 @@ import os
 
 ASSETS_DIR = 'assets'
 
+SMALL_CAPS_MAP = {
+    "A": "ᴀ", "B": "ʙ", "C": "ᴄ", "D": "ᴅ", "E": "ᴇ", "F": "ꜰ",
+    "G": "ɢ", "H": "ʜ", "I": "ɪ", "J": "ᴊ", "K": "ᴋ", "L": "ʟ",
+    "M": "ᴍ", "N": "ɴ", "O": "ᴏ", "P": "ᴘ", "Q": "Q", "R": "ʀ",
+    "S": "ꜛ", "T": "ᴛ", "U": "ᴜ", "V": "ᴠ", "W": "ᴡ", "X": "x",
+    "Y": "ʏ", "Z": "ᴢ"
+}
+
+
+def to_small_caps(text: str) -> str:
+    return "".join(SMALL_CAPS_MAP.get(ch, ch) for ch in str(text).upper())
+
+
 async def generate_series_banner():
     pass
 
+
 def build_tmdb_card(tmdb_result: dict, fallback_series_name: str = "Unknown") -> str:
-    title = (tmdb_result.get("title") or fallback_series_name).upper()
+    title = to_small_caps(tmdb_result.get("title") or fallback_series_name)
     year = tmdb_result.get("year", "")
-    media_type_str = "TVSeries" if tmdb_result.get("media_type") == "tv" else "Movie"
+    media_type_str = to_small_caps("TVSeries" if tmdb_result.get("media_type") == "tv" else "Movie")
     rating = tmdb_result.get("rating", 0.0)
     actors = ", ".join(tmdb_result.get("actors", []))
     
@@ -27,11 +41,11 @@ def build_tmdb_card(tmdb_result: dict, fallback_series_name: str = "Unknown") ->
     overview = tmdb_result.get("overview", "")
     poster_url = tmdb_result.get("poster_url", "")
     
-    card_text = f"**{title}** ({year}) • {media_type_str}\n"
+    card_text = f"**{to_small_caps(title)}** ({year}) • {media_type_str}\n"
     if actors:
-        card_text += f"Actors: {actors}\n\n"
+        card_text += f"{to_small_caps('Actors')}: {actors}\n\n"
     if formatted_genres:
-        card_text += f"Genres: {formatted_genres}\n"
+        card_text += f"{to_small_caps('Genres')}: {formatted_genres}\n"
     if overview:
         card_text += f"{overview}\n"
     
@@ -49,8 +63,8 @@ def build_quality_cards(successful_links: dict, final_meta: dict) -> list[str]:
     
     for quality, seasons in successful_links.items():
         formatted_quality = quality.upper().strip()
-        caption = f"🎭 **{title}{year_str}**\n"
-        caption += f"📦 **QUALITY - {formatted_quality}**\n\n"
+        caption = f"🎭 **{to_small_caps(title)}{year_str}**\n"
+        caption += f"📦 **{to_small_caps('QUALITY')} - {to_small_caps(formatted_quality)}**\n\n"
         
         def get_season_num(s_key):
             try:
@@ -64,10 +78,15 @@ def build_quality_cards(successful_links: dict, final_meta: dict) -> list[str]:
             audio_links = []
             for audio_tag, link in audios.items():
                 audio_display = audio_tag.upper().strip()
-                audio_links.append(f"[{audio_display}]({link})")
+                audio_links.append(f"[{to_small_caps(audio_display)}]({link})")
             caption += f" || {' || '.join(audio_links)} ||\n\n"
             
-        caption += "_Click on the required audio and then Press Start in the bot_"
+        caption += "***Click on the required audio and then Press Start in the bot***"
         cards.append(caption)
         
     return cards
+
+async def send_final_ready_sticker():
+    sticker_path = os.path.join(ASSETS_DIR, "shadow_sticker.webp")
+    if os.path.exists(sticker_path):
+        await userbot.send_message(config.ready_channel, file=sticker_path)

@@ -12,7 +12,7 @@ from telethon.errors import FloodWaitError
 from src.libs.user_client import bot, userbot
 import re
 from src.ui.shadow_messages import send_join_link, send_final_sticker
-from src.ui.ready_messages import build_tmdb_card, build_quality_cards
+from src.ui.ready_messages import build_tmdb_card, build_quality_cards, send_final_ready_sticker
 
 ASSETS_DIR = 'assets'
 DOWNLOAD_DIR = "downloads"
@@ -219,6 +219,7 @@ async def process_files(batches: list, reply_chat_id: int, final_meta:dict):
                 config.ready_channel, card_text, 
                 link_preview=False
             )
+            await send_final_ready_sticker()
         await bot.send_message(reply_chat_id, f"✅ Archive Complete!\nBroadcasted {len(successful_links)} quality tiers.")
     else:
         await bot.send_message(reply_chat_id, "❌ **Archive Failed:** No successful batches were bridged.")
