@@ -142,7 +142,7 @@ def generate_header_text(file_name: str) -> str:
         f"**Season** {season} {part_str}\n"
         f"**{quality}**\n"
         f"**Audio - {"+ ".join(language)}**\n"
-        f"**Subtitles {'👍' if len(sub) else '👎'}\n"
+        f"**Subtitles** {'👍' if len(sub) else '👎'}\n"
         "👇👇👇👇👇"
     )
     return header

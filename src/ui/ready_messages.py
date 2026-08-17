@@ -5,18 +5,42 @@ import os
 ASSETS_DIR = 'assets'
 
 SMALL_CAPS_MAP = {
-    "A": "\u1D00", "B": "\u0299", "C": "\u1D04", "D": "\u1D05", 
-    "E": "\u1D07", "F": "\uA730", "G": "\u0262", "H": "\u029C", 
-    "I": "\u026A", "J": "\u1D0A", "K": "\u1D0B", "L": "\u029F", 
-    "M": "\u1D0D", "N": "\u0274", "O": "\u1D0F", "P": "\u1D18", 
-    "Q": "\u01EB", "R": "\u0280", "S": "\u1D5B", "T": "\u1D1B", 
-    "U": "\u1D1C", "V": "\u1D20", "W": "\u1D21", "X": "x", 
-    "Y": "\u028F", "Z": "\u1D22"
+    "A": "ᴀ",
+    "B": "ʙ",
+    "C": "ᴄ",
+    "D": "ᴅ",
+    "E": "ᴇ",
+    "F": "ꜰ",
+    "G": "ɢ",
+    "H": "ʜ",
+    "I": "ɪ",
+    "J": "ᴊ",
+    "K": "ᴋ",
+    "L": "ʟ",
+    "M": "ᴍ",
+    "N": "ɴ",
+    "O": "ᴏ",
+    "P": "ᴘ",
+    "Q": "ꞯ",
+    "R": "ʀ",
+    "S": "ꜱ",
+    "T": "ᴛ",
+    "U": "ᴜ",
+    "V": "ᴠ",
+    "W": "ᴡ",
+    "X": "ˣ",
+    "Y": "ʏ",
+    "Z": "ᴢ",
 }
 
 
 def to_small_caps(text: str) -> str:
-    return "".join(SMALL_CAPS_MAP.get(ch, ch) for ch in str(text).upper())
+    return "".join(
+        SMALL_CAPS_MAP.get(ch.upper(), ch)
+        if ch.isascii() and ch.isalpha()
+        else ch
+        for ch in str(text)
+    )
 
 
 async def generate_series_banner():
