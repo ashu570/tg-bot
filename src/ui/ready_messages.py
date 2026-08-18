@@ -95,12 +95,16 @@ def build_quality_cards(successful_links: dict, final_meta: dict) -> list[str]:
         
         def get_season_num(s_key):
             try:
-                return int(s_key.split('#')[-1])
+                season_parts = s_key.split('#')
+                season_num = int(season_parts[1]) if len(season_parts) > 1 else 0
+                part_num = int(season_parts[3]) if len(season_parts) > 3 else 0
+                return (season_num, part_num)
             except:
-                return 999
+                return (999,0)
                 
         for season_key, audios in sorted(seasons.items(), key=lambda x: get_season_num(x[0])):
-            season_display = season_key.replace('#', ' ').upper()
+            season_parts = season_key.split('#')
+            season_display = f"{season_parts[0]} {season_parts[1]} ({season_parts[2]}-{season_parts[3]})" if len(season_parts) > 2 else f"{season_parts[0]} {season_parts[1]}"
             caption += f"🔹 **{season_display}**\n"
             audio_links = []
             for audio_tag, link in audios.items():

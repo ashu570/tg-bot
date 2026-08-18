@@ -188,7 +188,7 @@ async def process_files(batches: list, reply_chat_id: int, final_meta:dict):
         ) 
         if not is_cancelled and shadow_messages:
             if part and len(part):
-                season_key = f"{season_key}({part})"
+                season_key = f"{season_key}#{part.replace('-','#')})"
             batch_link = await generate_native_link(shadow_messages, reply_chat_id, len(shadow_messages), batch_index, len(batches))
             if batch_link:
                 successful_links.setdefault(quality, {}).setdefault(season_key, {})
