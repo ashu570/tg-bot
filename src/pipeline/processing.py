@@ -179,6 +179,7 @@ async def process_files(batches: list, reply_chat_id: int, final_meta:dict):
         batch_meta = common_helper.file_meta_extractor(batch_first_file)
         quality = batch_meta.get('quality', 'Unknown')
         season = batch_meta.get('season')
+        season_name =  f"{batch_meta.get("title")} S{batch_meta.get("season")}"
         audio_tags = batch_meta.get('custom_audio') or ['Default Audio']
         season_key = f"Season#{season}" if season is not None else "Season"
         part = batch_meta.get("part")
@@ -188,7 +189,7 @@ async def process_files(batches: list, reply_chat_id: int, final_meta:dict):
         ) 
         if not is_cancelled and shadow_messages:
             if part and len(part):
-                season_key = f"{season_key}#{part.replace('-','#')})"
+                season_key = f"{season_key}#{part.replace('-','#')}"
             batch_link = await generate_native_link(shadow_messages, reply_chat_id, len(shadow_messages), batch_index, len(batches))
             if batch_link:
                 successful_links.setdefault(quality, {}).setdefault(season_key, {})
