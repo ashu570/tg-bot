@@ -2,7 +2,7 @@ import os
 import asyncio
 from src.libs.logger import logger
 from src.libs.user_client import bot
-from src.pipeline.publish import publish_and_cleanup,generate_header_text, bridge_to_link_bot, generate_final_message, generate_native_link
+from src.pipeline.publish import publish_and_cleanup,generate_header_text, bridge_to_link_bot, generate_native_link
 from src.helper.commons import ACTIVE_BATCHES, ACTIVE_SELECTION_META, common_helper, CANCELLED_EVENTS
 from src.helper.file_formator import format_video_metadata
 from src.helper.progress_tracker import ProgressTracker, ProcessCancelledError
@@ -12,7 +12,7 @@ from telethon.errors import FloodWaitError
 from src.libs.user_client import bot, userbot
 import re
 from src.ui.shadow_messages import send_join_link, send_final_sticker
-from src.ui.ready_messages import build_tmdb_card, build_quality_cards, send_final_ready_sticker
+from src.ui.ready_messages import build_tmdb_card, build_quality_cards, send_final_ready_sticker, generate_final_message
 
 ASSETS_DIR = 'assets'
 DOWNLOAD_DIR = "downloads"

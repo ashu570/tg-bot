@@ -21,20 +21,21 @@ SMALL_CAPS_MAP = {
     "N": "ɴ",
     "O": "ᴏ",
     "P": "ᴘ",
-    "Q": "ꞯ",
+    "Q": "ǫ",
     "R": "ʀ",
     "S": "ꜱ",
     "T": "ᴛ",
     "U": "ᴜ",
     "V": "ᴠ",
     "W": "ᴡ",
-    "X": "ˣ",
+    "X": "x",
     "Y": "ʏ",
     "Z": "ᴢ",
 }
 
 
 def to_small_caps(text: str) -> str:
+
     return "".join(
         SMALL_CAPS_MAP.get(ch.upper(), ch)
         if ch.isascii() and ch.isalpha()
@@ -116,3 +117,31 @@ async def send_final_ready_sticker():
     sticker_path = os.path.join(ASSETS_DIR, "shadow_sticker.webp")
     if os.path.exists(sticker_path):
         await userbot.send_message(config.ready_channel, file=sticker_path)
+
+def generate_final_message (successful_links: dict, final_meta:dict) -> str:
+    title = final_meta.get("title", "UNKNOWN TITLE").upper()
+    year = final_meta.get("year", "")
+    raw_season = final_meta.get("selected_seasons", "1")
+    season_seq = '1'
+    if raw_season:
+        sorted_season_meta = sorted(map(int, raw_season))
+        season_seq = "1" if not sorted_season_meta else str(sorted_season_meta[0]) if len(sorted_season_meta) == 1 else f"{sorted_season_meta[0]}-{sorted_season_meta[-1]}"
+
+    sub = final_meta.get("custom_subs", "[]")
+    year_str = f" • {year}" if year else ""
+
+    quality_labels = [to_small_caps(quality_label.strip()) for quality_label in successful_links.keys()]
+    caption = (
+        f"🎭 **{to_small_caps(title)}{year_str}**\n"
+        f"📁 **{to_small_caps('SEASON')} - {season_seq}**\n"
+        f"💬 **{to_small_caps('SUBTITLES')}** - {'👍' if len(sub) > 0 and sub != '[]' else '👎'}\n"
+        f"\n"
+        f"📦 **{to_small_caps('QUALITY')}**\n"
+        f"|| {' || '.join(quality_labels)} ||\n"
+    )
+    caption += (
+        f"\n"
+        f"༄༅──────────────༅༄\n"
+        f"@TIFDiscuss 🌹 @TIF_WebSeries"
+    )
+    return caption
