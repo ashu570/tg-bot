@@ -1,4 +1,3 @@
-```bash
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -171,4 +170,3 @@ echo "Virtual environment: $VENV_DIR"
 echo
 echo "To activate it later:"
 echo "source $VENV_DIR/bin/activate"
-```
